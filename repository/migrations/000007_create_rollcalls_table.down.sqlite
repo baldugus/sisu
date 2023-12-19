@@ -1,0 +1,3 @@
+DROP INDEX idx_rollcalls_number;
+DROP INDEX idx_rollcalls_status;
+DROP TABLE rollcalls;

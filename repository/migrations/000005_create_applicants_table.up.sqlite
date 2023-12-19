@@ -1,0 +1,19 @@
+CREATE TABLE applicants (
+  id             INTEGER PRIMARY KEY,
+  cpf            TEXT NOT NULL UNIQUE,
+  name           TEXT NOT NULL,
+  social_name    TEXT NOT NULL,
+  birthdate      TEXT NOT NULL,
+  sex            TEXT NOT NULL,
+  mother_name    TEXT NOT NULL,
+  address_line   TEXT NOT NULL,
+  address_line2  TEXT NOT NULL,
+  house_number   TEXT NOT NULL,
+  neighborhood   TEXT NOT NULL,
+  municipality   TEXT NOT NULL,
+  state          TEXT NOT NULL,
+  cep            TEXT NOT NULL,
+  email          TEXT NOT NULL,
+  phone1         TEXT NOT NULL,
+  phone2         TEXT NOT NULL
+);
