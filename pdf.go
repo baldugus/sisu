@@ -207,9 +207,14 @@ func applicationsToWebsite(classes []*types.Class, rollcallID *int64, applicatio
 		rows = append(rows, text.NewRow(20, class.Quota.Name, titleText))
 
 		for i, application := range applications {
+			name := application.Applicant.Name
+			if application.Applicant.SocialName != "" {
+				name = application.Applicant.SocialName
+			}
+
 			var item WebsiteListItem
 			item.Order = i + 1
-			item.Name = application.Applicant.Name
+			item.Name = name
 			item.Score = application.CompositeScore
 			item.EnrollmentID = application.EnrollmentID
 
@@ -257,9 +262,14 @@ func applicationsToEnrollment(classes []*types.Class, rollcallID *int64, applica
 		rows = append(rows, text.NewRow(20, class.Quota.Name, titleText))
 
 		for i, application := range applications {
+			name := application.Applicant.Name
+			if application.Applicant.SocialName != "" {
+				name = application.Applicant.SocialName
+			}
+
 			var item EnrollmentListItem
 			item.Order = i + 1
-			item.Name = application.Applicant.Name
+			item.Name = name
 			item.Score = application.CompositeScore
 			item.EnrollmentID = application.EnrollmentID
 
@@ -307,9 +317,14 @@ func applicationsToEmail(classes []*types.Class, rollcallID *int64, applications
 		rows = append(rows, text.NewRow(20, class.Quota.Name, titleText))
 
 		for i, application := range applications {
+			name := application.Applicant.Name
+			if application.Applicant.SocialName != "" {
+				name = application.Applicant.SocialName
+			}
+
 			var item EmailsListItem
 			item.Order = i + 1
-			item.Name = application.Applicant.Name
+			item.Name = name
 			item.Score = application.CompositeScore
 			item.EnrollmentID = application.EnrollmentID
 			item.Email = application.Email
@@ -353,9 +368,14 @@ func applicationsToTeacher(classes []*types.Class, applicationsRepo types.Applic
 		}
 
 		for _, application := range applications {
+			name := application.Applicant.Name
+			if application.Applicant.SocialName != "" {
+				name = application.Applicant.SocialName
+			}
+
 			var item TeacherListItem
 			item.Order = len(items) + 1
-			item.Name = application.Applicant.Name
+			item.Name = name
 			items = append(items, item)
 		}
 	}
