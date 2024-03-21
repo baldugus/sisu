@@ -1,6 +1,8 @@
 module changeme
 
-go 1.18
+go 1.21.1
+
+toolchain go1.22.1
 
 require (
 	github.com/alecthomas/kong v0.8.0

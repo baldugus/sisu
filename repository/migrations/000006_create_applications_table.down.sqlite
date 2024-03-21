@@ -1,6 +1,0 @@
-DROP INDEX idx_applications_selection_id;
-DROP INDEX idx_applications_status;
-DROP INDEX idx_applications_rollcall_id;
-DROP INDEX idx_applications_class_id;
-DROP INDEX idx_applications_applicant_id;
-DROP TABLE applications;

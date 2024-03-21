@@ -1,3 +1,5 @@
+-- +goose Up
+-- +goose StatementBegin
 CREATE TABLE applicants (
   id             INTEGER PRIMARY KEY,
   cpf            TEXT NOT NULL UNIQUE,
@@ -17,3 +19,9 @@ CREATE TABLE applicants (
   phone1         TEXT NOT NULL,
   phone2         TEXT NOT NULL
 );
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE applicants;
+-- +goose StatementEnd

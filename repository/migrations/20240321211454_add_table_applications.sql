@@ -1,3 +1,5 @@
+-- +goose Up
+-- +goose StatementBegin
 CREATE TABLE applications (
   id                     INTEGER PRIMARY KEY,
   enrollment_id          TEXT NOT NULL UNIQUE,
@@ -21,3 +23,14 @@ CREATE INDEX idx_applications_status ON applications(status);
 CREATE INDEX idx_applications_rollcall_id ON applications(rollcall_id);
 CREATE INDEX idx_applications_class_id ON applications(class_id);
 CREATE INDEX idx_applications_applicant_id ON applications(applicant_id);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP INDEX idx_applications_selection_id;
+DROP INDEX idx_applications_status;
+DROP INDEX idx_applications_rollcall_id;
+DROP INDEX idx_applications_class_id;
+DROP INDEX idx_applications_applicant_id;
+DROP TABLE applications;
+-- +goose StatementEnd

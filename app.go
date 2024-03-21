@@ -3,11 +3,10 @@
 package main
 
 import (
+	"changeme/repository"
 	"context"
 	"fmt"
 	"regexp"
-
-	"changeme/types"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -43,7 +42,7 @@ func (a *App) LoadApprovedSelection() Response {
 		return Response{500, err.Error(), ""}
 	}
 
-	if err := a.sisu.LoadSelection(file, types.ApprovedSelection); err != nil {
+	if err := a.sisu.LoadSelection(file, repository.ApprovedSelection); err != nil {
 		return Response{500, err.Error(), ""}
 	}
 
@@ -63,7 +62,7 @@ func (a *App) LoadInterestedSelection() Response {
 		return Response{500, err.Error(), ""}
 	}
 
-	if err := a.sisu.LoadSelection(file, types.InterestedSelection); err != nil {
+	if err := a.sisu.LoadSelection(file, repository.InterestedSelection); err != nil {
 		return Response{500, err.Error(), ""}
 	}
 
@@ -315,7 +314,7 @@ func (a *App) TeacherPDF(periodID int64) Response {
 }
 
 func (a *App) DeleteApprovedSelection() Response {
-	if err := a.sisu.DeleteSelection(types.ApprovedSelection); err != nil {
+	if err := a.sisu.DeleteSelection(repository.ApprovedSelection); err != nil {
 		return Response{500, err.Error(), ""}
 	}
 
@@ -323,7 +322,7 @@ func (a *App) DeleteApprovedSelection() Response {
 }
 
 func (a *App) DeleteInterestedSelection() Response {
-	if err := a.sisu.DeleteSelection(types.InterestedSelection); err != nil {
+	if err := a.sisu.DeleteSelection(repository.InterestedSelection); err != nil {
 		return Response{500, err.Error(), ""}
 	}
 
