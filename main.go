@@ -24,13 +24,13 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed repository/migrations
-var migrations embed.FS
+//o:embed repository/migrations
+//var migrations embed.FS
 
 // This needs to be done somewhere else.
-func main() {
-	os.Exit(run())
-}
+//func main() {
+//	os.Exit(run())
+//}
 
 // FIXME: too long fsr.
 func run() int { //nolint: funlen
