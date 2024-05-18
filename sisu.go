@@ -14,7 +14,9 @@ import (
 	"strconv"
 	"strings"
 
+	repository2 "changeme/internal/repository"
 	"changeme/repository"
+
 	"changeme/types"
 
 	"github.com/dimchansky/utfbom"
@@ -25,7 +27,7 @@ import (
 // FIXME: import is no longer called import.
 // TODO: check if all of them are used.
 var (
-	ErrAlreadyImported               = errors.New("Arquivo deste tipo já foi importado")
+	ErrTxDB                          = errors.New("Erro na transação, contate o desenvolvedor")
 	ErrApplicationNotFoundOrNotAvail = errors.New("Inscrição não encontrada ou não disponível para esta ação")
 	ErrCloseFail                     = errors.New("Ainda existem alunos pendentes nesta chamada")
 	ErrCloseRollCall                 = errors.New("Erro desconhecido ao atualizar chamada, mais detalhes nos logs")
@@ -52,6 +54,7 @@ var (
 )
 
 type SISU struct {
+	repo            *repository2.Repository
 	applicantRepo   repository.ApplicantRepository
 	applicationRepo repository.ApplicationRepository
 	classRepo       repository.ClassRepository
@@ -129,14 +132,25 @@ func (s *SISU) LoadSelection(path string, kind types.SelectionKind) error { //no
 		selection.Course = rawApplications[0].Course
 	}
 
-	if err := s.selectionRepo.Begin(); err != nil {
-		return fmt.Errorf("begin: %w", err)
+	if ok, err := s.ValidateSelection(&selection); !ok {
+		return err
 	}
-	defer s.selectionRepo.Rollback()
 
-	if err := s.selectionRepo.CreateSelection(&selection); err != nil {
-		return fmt.Errorf("create selection: %w", err)
+	tx, err := s.repo.Begin()
+	if err != nil {
+		s.l.Errorw("db begin transaction", "err", err)
+
+		return ErrTxDB
 	}
+	defer tx.Rollback()
+
+	id, err := tx.SaveSelection(&selection)
+	if err != nil {
+		s.l.Errorw("db save selection", "err", err)
+
+		return ErrTxDB
+	}
+	selection.ID = id
 
 	var rollcall types.Rollcall
 	if selection.Kind == types.ApprovedSelection {
@@ -161,8 +175,10 @@ func (s *SISU) LoadSelection(path string, kind types.SelectionKind) error { //no
 		}
 	}
 
-	if err := s.selectionRepo.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+	if err := tx.Commit(); err != nil {
+		s.l.Errorw("db commit transaction", "err", err)
+
+		return ErrTxDB
 	}
 
 	return nil

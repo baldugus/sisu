@@ -1,12 +1,12 @@
 package main
 
 import (
-	"embed"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 
+	repository2 "changeme/internal/repository"
 	"changeme/repository"
 
 	"github.com/alecthomas/kong"
@@ -16,13 +16,9 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/wailsapp/wails/v2"
 	wailsoptions "github.com/wailsapp/wails/v2/pkg/options"
-	wailsassetserver "github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"go.uber.org/zap"
 	_ "modernc.org/sqlite"
 )
-
-//go:embed all:frontend/dist
-var assets embed.FS
 
 //o:embed repository/migrations
 //var migrations embed.FS
@@ -83,8 +79,12 @@ func run() int { //nolint: funlen
 	rollcallRepo := repository.NewRollcallRepository(DB)
 	selectionRepo := repository.NewSelectionRepository(DB)
 
+	// new repo
+	repo := repository2.Repository{DB: sqliteDB}
+
 	// defer applicationRepository.Close(sqliteDB)
 	sisu := SISU{
+		repo:            &repo,
 		applicantRepo:   *applicantRepo,
 		applicationRepo: *applicationRepo,
 		classRepo:       *classRepo,
@@ -97,15 +97,11 @@ func run() int { //nolint: funlen
 	var app App
 	app.sisu = sisu
 
-	var assetServerOptions wailsassetserver.Options
-	assetServerOptions.Assets = assets
-
 	// Create application with options
 	var options wailsoptions.App
 	options.Title = "sisu"
 	options.Width = 1024
 	options.Height = 768
-	options.AssetServer = &assetServerOptions
 	options.BackgroundColour = &wailsoptions.RGBA{R: 27, G: 38, B: 54, A: 1}
 	options.OnStartup = app.startup
 	options.Bind = []any{&app}

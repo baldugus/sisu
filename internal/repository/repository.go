@@ -2,29 +2,32 @@ package repository
 
 import (
 	"fmt"
-	"go/types"
+
+	"changeme/types"
 
 	"changeme/internal/sql"
 
 	"github.com/jmoiron/sqlx"
 )
 
+type db interface {
+	Select(dest interface{}, query string, args ...interface{}) error
+}
+
 type Repository struct {
 	*sqlx.DB
 }
 
-func (r *Repository) SaveSelection(selection *types.Selection) (int64, error) {
-	query := sql.Query("insert_selection")
+type RepositoryTx struct {
+	*sqlx.Tx
+	*Repository
+}
 
-	res, err := r.NamedExec(query, selection)
+func (r *Repository) Begin() (*RepositoryTx, error) {
+	tx, err := r.DB.Beginx()
 	if err != nil {
-		return 0, fmt.Errorf("insert selection: %w", err)
+		return nil, err
 	}
 
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("insert selection id: %w", err)
-	}
-
-	return id, nil
+	return &RepositoryTx{Tx: tx, Repository: r}, nil
 }
