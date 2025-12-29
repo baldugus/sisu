@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"changeme/repository"
-	"changeme/types"
+	"github.com/baldugus/sisu/repository"
+	"github.com/baldugus/sisu/types"
 
 	"github.com/google/go-cmp/cmp"
 )

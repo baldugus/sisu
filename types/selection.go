@@ -9,6 +9,10 @@ import (
 
 type SelectionKind int
 
+// TODO: Replace this logic with something like
+// type Kind string
+// const KindApproved Kind = "APPROVED"
+// func (k Kind) String() string {} <- switch types and return the type
 const (
 	ApprovedSelection SelectionKind = iota + 1
 	InterestedSelection

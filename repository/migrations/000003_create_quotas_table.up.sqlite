@@ -1,0 +1,6 @@
+CREATE TABLE quotas (
+  id   INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_quotas_name ON quotas(name);

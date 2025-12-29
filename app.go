@@ -4,10 +4,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 
-	"changeme/types"
+	"github.com/baldugus/sisu/csvparser"
+	"github.com/baldugus/sisu/types"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -16,6 +18,27 @@ type Response struct {
 	Status int    `json:"status"`
 	Msg    string `json:"msg"`
 	Data   any    `json:"data"`
+}
+
+func CsvErrorToResponse(err error) Response {
+	switch {
+	case errors.As(err, &csvparser.FileNotFoundError{}):
+		return Response{500, "Arquivo selecionado não existe.", ""}
+	case errors.As(err, &csvparser.PermissionDeniedError{}):
+		return Response{500, "Permissão negada para acessar o arquivo.", ""}
+	case errors.As(err, &csvparser.FileError{}):
+		return Response{500, "Erro ao abrir o arquivo CSV. Contate o desenvolvedor.", ""}
+	case errors.As(err, &csvparser.ReadError{}):
+		return Response{500, "Erro ao ler o arquivo CSV. Contate o desenvolvedor.", ""}
+	case errors.As(err, &csvparser.EmptyError{}):
+		return Response{500, "Arquivo CSV vazio.", ""}
+	case errors.As(err, &csvparser.ParseError{}):
+		return Response{500, "Erro ao analisar o arquivo CSV. Contate o desenvolvedor.", ""}
+	case errors.As(err, &csvparser.MapperError{}):
+		return Response{500, "Erro de validação em um campo do arquivo CSV. Contate o desenvolvedor.", ""}
+	default:
+		return Response{500, "Erro desconhecido ao processar o arquivo CSV. Contate o desenvolvedor.", ""}
+	}
 }
 
 // App struct.
@@ -44,7 +67,7 @@ func (a *App) LoadApprovedSelection() Response {
 	}
 
 	if err := a.sisu.LoadSelection(file, types.ApprovedSelection); err != nil {
-		return Response{500, err.Error(), ""}
+		return CsvErrorToResponse(err)
 	}
 
 	return Response{200, "OK", ""}
@@ -64,7 +87,7 @@ func (a *App) LoadInterestedSelection() Response {
 	}
 
 	if err := a.sisu.LoadSelection(file, types.InterestedSelection); err != nil {
-		return Response{500, err.Error(), ""}
+		return CsvErrorToResponse(err)
 	}
 
 	return Response{200, "OK", ""}
@@ -191,7 +214,7 @@ func (a *App) WebsitePDF(rollcallID int64, periodID int64) Response {
 
 func (a *App) ExportCSV() Response {
 	var options runtime.SaveDialogOptions
-	options.DefaultFilename = fmt.Sprintf("alunos-aprovados.csv")
+	options.DefaultFilename = "alunos-aprovados.csv"
 
 	file, err := runtime.SaveFileDialog(a.ctx, options)
 	if err != nil {
@@ -207,7 +230,7 @@ func (a *App) ExportCSV() Response {
 
 func (a *App) Backup() Response {
 	var options runtime.SaveDialogOptions
-	options.DefaultFilename = fmt.Sprintf("backup.sisu")
+	options.DefaultFilename = "backup.sisu"
 
 	file, err := runtime.SaveFileDialog(a.ctx, options)
 	if err != nil {

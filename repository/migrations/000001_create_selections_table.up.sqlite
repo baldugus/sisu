@@ -1,0 +1,10 @@
+CREATE TABLE selections (
+  id          INTEGER PRIMARY KEY,
+  kind        INTEGER UNIQUE,
+  name        TEXT NOT NULL,
+  date        TEXT NOT NULL,
+  institution TEXT NOT NULL,
+  course      TEXT NOT NULL
+);
+
+CREATE INDEX idx_selections_kind ON selections(kind);

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"changeme/types"
+	"github.com/baldugus/sisu/types"
 )
 
 type SelectionRepository struct {

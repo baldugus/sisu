@@ -6,6 +6,7 @@ import (
 	"fmt"
 )
 
+// Remove embedding/nesting completely (?)
 type Application struct {
 	ID                   int64
 	Status               string
@@ -22,6 +23,12 @@ type Application struct {
 	Rollcall             `db:"rollcall" json:"-"`
 	Class                `db:"class"`
 }
+
+type Applications []*Application
+
+func (v Applications) Len() int           { return len(v) }
+func (v Applications) Swap(i, j int)      { v[i], v[j] = v[j], v[i] }
+func (v Applications) Less(i, j int) bool { return v[i].Ranking < v[j].Ranking }
 
 var (
 	ErrApplicationNotEditable = errors.New("this application is not editable")

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"changeme/types"
+	"github.com/baldugus/sisu/types"
 )
 
 type ClassRepository struct {
