@@ -1,0 +1,76 @@
+-- Selections
+CREATE TABLE selections (
+  id          INTEGER NOT NULL PRIMARY KEY,
+  kind        TEXT UNIQUE NOT NULL CHECK ( kind IN ('approved', 'waitlist') ),
+  name        TEXT NOT NULL,
+  year        INTEGER NOT NULL,
+  semester    INTEGER NOT NULL CHECK (semester IN (1, 2)),
+  institution TEXT NOT NULL,
+  degree      TEXT NOT NULL
+);
+
+-- Calls
+CREATE TABLE calls (
+  id     INTEGER NOT NULL PRIMARY KEY,
+  number INTEGER UNIQUE NOT NULL,
+  status TEXT NOT NULL CHECK ( status IN ('calling', 'done') )
+);
+
+CREATE UNIQUE INDEX idx_one_active_call ON calls(status) WHERE status = 'calling';
+
+-- Quotas
+CREATE TABLE quotas (
+  id   INTEGER NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
+);
+
+-- Courses
+CREATE TABLE courses (
+  id            INTEGER NOT NULL PRIMARY KEY,
+  time_slot     TEXT NOT NULL CHECK ( time_slot IN ('morning', 'evening') ),
+  quota_id      INTEGER NOT NULL REFERENCES quotas ON DELETE RESTRICT ON UPDATE RESTRICT,
+  seats         INTEGER NOT NULL,
+  minimum_score INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_course_time_slot_quota ON courses(time_slot, quota_id);
+
+-- Candidates
+CREATE TABLE candidates (
+  id             INTEGER NOT NULL PRIMARY KEY,
+  cpf            TEXT NOT NULL UNIQUE,
+  name           TEXT NOT NULL,
+  social_name    TEXT NOT NULL,
+  birthdate      TEXT NOT NULL,
+  sex            TEXT NOT NULL,
+  mother_name    TEXT NOT NULL,
+  address_line   TEXT NOT NULL,
+  address_line2  TEXT NOT NULL,
+  house_number   TEXT NOT NULL,
+  neighborhood   TEXT NOT NULL,
+  municipality   TEXT NOT NULL,
+  state          TEXT NOT NULL,
+  cep            TEXT NOT NULL,
+  email          TEXT NOT NULL,
+  phone1         TEXT NOT NULL,
+  phone2         TEXT NOT NULL
+);
+
+-- Registrations
+CREATE TABLE registrations (
+  id                     INTEGER NOT NULL PRIMARY KEY,
+  enrollment_id          TEXT NOT NULL UNIQUE,
+  course_id              INTEGER NOT NULL REFERENCES courses ON DELETE RESTRICT ON UPDATE RESTRICT,
+  option                 INTEGER NOT NULL,
+  languages_score        INTEGER NOT NULL,
+  humanities_score       INTEGER NOT NULL,
+  natural_sciences_score INTEGER NOT NULL,
+  mathematics_score      INTEGER NOT NULL,
+  essay_score            INTEGER NOT NULL,
+  composite_score        INTEGER NOT NULL,
+  ranking                INTEGER NOT NULL,
+  status                 TEXT NOT NULL CHECK (status IN ('approved', 'waitlisted', 'absent', 'enrolled')),
+  selection_id           INTEGER NOT NULL REFERENCES selections ON DELETE RESTRICT ON UPDATE RESTRICT,
+  call_id                INTEGER DEFAULT NULL REFERENCES calls ON DELETE SET NULL ON UPDATE RESTRICT,
+  candidate_id           INTEGER NOT NULL REFERENCES candidates ON DELETE RESTRICT ON UPDATE RESTRICT
+);

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/baldugus/sisu/types"
 	"github.com/johnfercher/maroto/v2/pkg/components/list"
 	"github.com/johnfercher/maroto/v2/pkg/components/row"
 	"github.com/johnfercher/maroto/v2/pkg/components/text"
@@ -17,12 +18,12 @@ import (
 type EmailsListItem struct {
 	order        int
 	name         string
-	score        float64
+	score        *types.Score
 	enrollmentID string
 	email        string
 }
 
-func newEmailListItem(order int, name string, score float64, enrollmentID string, email string) EmailsListItem {
+func newEmailListItem(order int, name string, score *types.Score, enrollmentID string, email string) EmailsListItem {
 	return EmailsListItem{
 		order:        order,
 		name:         name,
@@ -36,7 +37,7 @@ func (e EmailsListItem) GetContent(_ int) core.Row {
 	return row.New(5).Add(
 		text.NewCol(1, fmt.Sprint(e.order)),
 		text.NewCol(5, e.name),
-		text.NewCol(1, fmt.Sprintf("%.2f", e.score)),
+		text.NewCol(1, fmt.Sprint(e.score)),
 		text.NewCol(2, e.enrollmentID),
 		text.NewCol(5, e.email),
 	)
@@ -57,7 +58,7 @@ func (e EmailsListItem) GetHeader() core.Row {
 
 type EmailRenderer struct{}
 
-func (e *EmailRenderer) Render(classes []*ClassInfo) ([]core.Row, error) {
+func (e *EmailRenderer) Render(courses []*CourseInfo) ([]core.Row, error) {
 	var titleText props.Text
 	titleText.Top = 10
 	titleText.Style = fontstyle.Bold
@@ -65,15 +66,20 @@ func (e *EmailRenderer) Render(classes []*ClassInfo) ([]core.Row, error) {
 
 	var rows []core.Row
 
-	for _, class := range classes {
-		sort.Sort(class.Applications)
+	for _, course := range courses {
+		// Skip courses with no registrations
+		if len(course.Registrations) == 0 {
+			continue
+		}
+
+		sort.Sort(course.Registrations)
 
 		var items []EmailsListItem
 
-		rows = append(rows, text.NewRow(20, class.Quota, titleText))
+		rows = append(rows, text.NewRow(20, course.Quota, titleText))
 
-		for i, application := range class.Applications {
-			item := newEmailListItem(i+1, application.Applicant.Name, application.CompositeScore, application.EnrollmentID, application.Applicant.Email)
+		for i, registration := range course.Registrations {
+			item := newEmailListItem(i+1, registration.Candidate.Name, registration.CompositeScore, registration.EnrollmentID, registration.Candidate.Email)
 			items = append(items, item)
 		}
 
@@ -96,8 +102,8 @@ func (e *EmailRenderer) header(selection *SelectionInfo, period string) []core.R
 		call.WriteString(fmt.Sprintf(" %d", selection.WaitlistNum))
 	}
 
-	call.WriteString(fmt.Sprintf(" - %s - ", selection.Year))
-	call.WriteString(fmt.Sprintf("%so. Semestre", selection.Semester))
+	call.WriteString(fmt.Sprintf(" - %d - ", selection.Year))
+	call.WriteString(fmt.Sprintf("%do. Semestre", selection.Semester))
 	period = fmt.Sprintf("TURNO: %s", period)
 
 	var headerText props.Text

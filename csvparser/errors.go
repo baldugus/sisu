@@ -2,104 +2,118 @@ package csvparser
 
 import "fmt"
 
-type FileNotFoundError struct {
+type ErrFileNotFound struct {
 	Path string
 	Err  error
 }
 
-func (e FileNotFoundError) Error() string {
+func (e ErrFileNotFound) Error() string {
 	return fmt.Sprintf("csv file not found: %s", e.Path)
 }
 
-func (e FileNotFoundError) Unwrap() error {
+func (e ErrFileNotFound) Unwrap() error {
 	return e.Err
 }
 
-type PermissionDeniedError struct {
+type ErrPermissionDenied struct {
 	Path string
 	Err  error
 }
 
-func (e PermissionDeniedError) Error() string {
+func (e ErrPermissionDenied) Error() string {
 	return fmt.Sprintf("permission denied to open csv file: %s", e.Path)
 }
 
-func (e PermissionDeniedError) Unwrap() error {
+func (e ErrPermissionDenied) Unwrap() error {
 	return e.Err
 }
 
-type FileError struct {
+type ErrFileOpen struct {
 	Path string
 	Err  error
 }
 
-func (e FileError) Error() string {
+func (e ErrFileOpen) Error() string {
 	return fmt.Sprintf("opening csv file (%s): %v", e.Path, e.Err)
 }
 
-func (e FileError) Unwrap() error {
+func (e ErrFileOpen) Unwrap() error {
 	return e.Err
 }
 
-type ReadError struct {
+type ErrFileRead struct {
 	Err error
 }
 
-func (e ReadError) Error() string {
+func (e ErrFileRead) Error() string {
 	return fmt.Sprintf("reading csv file: %v", e.Err)
 }
 
-func (e ReadError) Unwrap() error {
+func (e ErrFileRead) Unwrap() error {
 	return e.Err
 }
 
-type ParseError struct {
+type ErrFileParse struct {
 	Err error
 }
 
-func (e ParseError) Error() string {
+func (e ErrFileParse) Error() string {
 	return fmt.Sprintf("parsing csv file: %v", e.Err)
 }
 
-func (e ParseError) Unwrap() error {
+func (e ErrFileParse) Unwrap() error {
 	return e.Err
 }
 
-type EmptyError struct {
+type ErrFileEmpty struct {
 	Err error
 }
 
-func (e EmptyError) Error() string {
+func (e ErrFileEmpty) Error() string {
 	return fmt.Sprintf("csv file is empty: %v", e.Err)
 }
 
-func (e EmptyError) Unwrap() error {
+func (e ErrFileEmpty) Unwrap() error {
 	return e.Err
 }
 
 // TODO: temporary type before validation is done in the domain type
-type ValidationError struct {
+type ErrFieldValidation struct {
 	Field string
 	Err   error
 }
 
-func (e ValidationError) Error() string {
+func (e ErrFieldValidation) Error() string {
 	return fmt.Sprintf("validating csv field %s: %v", e.Field, e.Err)
 }
 
-func (e ValidationError) Unwrap() error {
+func (e ErrFieldValidation) Unwrap() error {
 	return e.Err
 }
 
-type MapperError struct {
+type ErrLineMapping struct {
 	Line int
 	Err  error
 }
 
-func (e MapperError) Error() string {
+func (e ErrLineMapping) Error() string {
 	return fmt.Sprintf("mapping csv line %d: %v", e.Line, e.Err)
 }
 
-func (e MapperError) Unwrap() error {
+func (e ErrLineMapping) Unwrap() error {
 	return e.Err
+}
+
+type ErrInvalidPeriod struct {
+	Period string
+}
+
+func (e ErrInvalidPeriod) Error() string {
+	return fmt.Sprintf("not a valid period: %s", e.Period)
+}
+
+type ErrNoRegistrationsFound struct{}
+
+func (e ErrNoRegistrationsFound) Error() string {
+	return "no candidates found in file"
 }

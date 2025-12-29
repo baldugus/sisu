@@ -5,14 +5,22 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
+	"os"
 	"regexp"
 
-	"github.com/baldugus/sisu/csvparser"
-	"github.com/baldugus/sisu/types"
-
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"go.uber.org/zap"
+
+	"github.com/baldugus/sisu/commands"
+	"github.com/baldugus/sisu/csvparser"
+	"github.com/baldugus/sisu/database"
+	"github.com/baldugus/sisu/types"
 )
+
+// SISU holds the application dependencies.
+type SISU struct {
+	database *database.Database
+}
 
 type Response struct {
 	Status int    `json:"status"`
@@ -20,24 +28,61 @@ type Response struct {
 	Data   any    `json:"data"`
 }
 
-func CsvErrorToResponse(err error) Response {
+func AppErrorToResponse(err error) Response {
 	switch {
-	case errors.As(err, &csvparser.FileNotFoundError{}):
+	case errors.As(err, &commands.ErrApprovedSelectionAlreadyExists{}):
+		return Response{500, "Não é possível importar a lista de aprovados quando já existe uma seleção.", ""}
+	case errors.As(err, &commands.ErrWaitlistSelectionRequiresApproved{}):
+		return Response{500, "Não é possível importar a lista de espera sem a lista de aprovados.", ""}
+	case errors.As(err, &csvparser.ErrFileNotFound{}):
 		return Response{500, "Arquivo selecionado não existe.", ""}
-	case errors.As(err, &csvparser.PermissionDeniedError{}):
+	case errors.As(err, &csvparser.ErrPermissionDenied{}):
 		return Response{500, "Permissão negada para acessar o arquivo.", ""}
-	case errors.As(err, &csvparser.FileError{}):
+	case errors.As(err, &csvparser.ErrFileOpen{}):
 		return Response{500, "Erro ao abrir o arquivo CSV. Contate o desenvolvedor.", ""}
-	case errors.As(err, &csvparser.ReadError{}):
+	case errors.As(err, &csvparser.ErrFileRead{}):
 		return Response{500, "Erro ao ler o arquivo CSV. Contate o desenvolvedor.", ""}
-	case errors.As(err, &csvparser.EmptyError{}):
+	case errors.As(err, &csvparser.ErrFileEmpty{}):
 		return Response{500, "Arquivo CSV vazio.", ""}
-	case errors.As(err, &csvparser.ParseError{}):
+	case errors.As(err, &csvparser.ErrFileParse{}):
 		return Response{500, "Erro ao analisar o arquivo CSV. Contate o desenvolvedor.", ""}
-	case errors.As(err, &csvparser.MapperError{}):
+	case errors.As(err, &csvparser.ErrLineMapping{}):
 		return Response{500, "Erro de validação em um campo do arquivo CSV. Contate o desenvolvedor.", ""}
+	case errors.As(err, &commands.ErrSelectionNotFound{}):
+		return Response{500, "Seleção não encontrada.", ""}
+	case errors.As(err, &commands.ErrCannotDeleteApprovedWithWaitlist{}):
+		return Response{500, "Não é possível excluir a lista de aprovados enquanto a lista de espera existir.", ""}
+	case errors.As(err, &commands.ErrSelectionHasModifiedRegistrations{}):
+		return Response{500, "Não é possível excluir a seleção com inscrições matriculadas ou ausentes.", ""}
+	case errors.As(err, &commands.ErrCallHasPendingRegistrations{}):
+		return Response{500, "Não é possível fechar a chamada com inscrições pendentes.", ""}
+	case errors.As(err, &commands.ErrRegistrationNotFound{}):
+		return Response{500, "Inscrição não encontrada.", ""}
+	case errors.As(err, &commands.ErrRegistrationNotInCall{}):
+		return Response{500, "Inscrição não está em uma chamada.", ""}
+	case errors.As(err, &commands.ErrCallNotOpen{}):
+		return Response{500, "A chamada não está aberta.", ""}
+	case errors.As(err, &commands.ErrInvalidStatusTransition{}):
+		return Response{500, "Transição de status inválida.", ""}
+	case errors.As(err, &commands.ErrNoSeatsAvailable{}):
+		return Response{500, "Não há vagas disponíveis no curso.", ""}
+	case errors.As(err, &commands.ErrOpenCallExists{}):
+		return Response{500, "Não é possível criar nova chamada enquanto outra está aberta.", ""}
+	case errors.As(err, &commands.ErrNoWaitlistedRegistrations{}):
+		return Response{500, "Não há inscrições na lista de espera.", ""}
+	case errors.As(err, &commands.ErrAllCoursesFull{}):
+		return Response{500, "Todas as vagas de todos os cursos estão ocupadas.", ""}
+	case errors.As(err, &commands.ErrCannotReopenCallWithLaterCalls{}):
+		return Response{500, "Não é possível reabrir a chamada enquanto existem chamadas posteriores.", ""}
+	case errors.As(err, &commands.ErrCannotDeleteWithMultipleCalls{}):
+		return Response{500, "Não é possível excluir a seleção quando existem múltiplas chamadas.", ""}
+	case errors.As(err, &commands.ErrCannotDeleteWithClosedFirstCall{}):
+		return Response{500, "Não é possível excluir a seleção quando a primeira chamada está fechada.", ""}
+	case errors.As(err, &commands.ErrCannotDeleteCallWithLaterCalls{}):
+		return Response{500, "Não é possível excluir a chamada enquanto existem chamadas posteriores.", ""}
 	default:
-		return Response{500, "Erro desconhecido ao processar o arquivo CSV. Contate o desenvolvedor.", ""}
+		zap.L().Error("unknown error", zap.Error(err))
+		return Response{500, "Erro desconhecido. Contate o desenvolvedor.", ""}
 	}
 }
 
@@ -53,309 +98,414 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-func (a *App) LoadApprovedSelection() Response {
-	var filter runtime.FileFilter
-	filter.DisplayName = "CSV File"
-	filter.Pattern = "*.csv"
+// OpenFileDialog opens a file picker dialog and returns the selected file path.
+func (a *App) OpenFileDialog(title string, filterPattern string, filterDisplay string) (string, error) {
+	homeDir, _ := os.UserHomeDir()
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:            title,
+		DefaultDirectory: homeDir,
+		Filters: []runtime.FileFilter{
+			{DisplayName: filterDisplay, Pattern: filterPattern},
+		},
+	})
+}
 
-	var options runtime.OpenDialogOptions
-	options.Filters = []runtime.FileFilter{filter}
+// SaveFileDialog opens a save file dialog and returns the selected file path.
+func (a *App) SaveFileDialog(title string, defaultFilename string, filterPattern string, filterDisplay string) (string, error) {
+	homeDir, _ := os.UserHomeDir()
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:            title,
+		DefaultDirectory: homeDir,
+		DefaultFilename:  defaultFilename,
+		Filters: []runtime.FileFilter{
+			{DisplayName: filterDisplay, Pattern: filterPattern},
+		},
+	})
+}
 
-	file, err := runtime.OpenFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
+func (a *App) LoadApprovedSelection(year int32, semester int32, filePath string) Response {
+	cmd := commands.LoadSelectionCommand{
+		Year:     year,
+		Semester: semester,
+		FilePath: filePath,
+		Kind:     types.SelectionKindApproved,
 	}
 
-	if err := a.sisu.LoadSelection(file, types.ApprovedSelection); err != nil {
-		return CsvErrorToResponse(err)
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
 	}
 
 	return Response{200, "OK", ""}
 }
 
-func (a *App) LoadInterestedSelection() Response {
-	var filter runtime.FileFilter
-	filter.DisplayName = "CSV File"
-	filter.Pattern = "*.csv"
-
-	var options runtime.OpenDialogOptions
-	options.Filters = []runtime.FileFilter{filter}
-
-	file, err := runtime.OpenFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
+func (a *App) LoadWaitlistSelection(year int32, semester int32, filePath string) Response {
+	cmd := commands.LoadSelectionCommand{
+		Year:     year,
+		Semester: semester,
+		FilePath: filePath,
+		Kind:     types.SelectionKindWaitlist,
 	}
 
-	if err := a.sisu.LoadSelection(file, types.InterestedSelection); err != nil {
-		return CsvErrorToResponse(err)
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
 	}
 
 	return Response{200, "OK", ""}
 }
 
-func (a *App) CloseRollCall(id int64) Response {
-	if err := a.sisu.CloseRollCall(id); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) OpenRollCall(id int64) Response {
-	if err := a.sisu.OpenRollCall(id); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
+func (a *App) LoadInterestedSelection(year int32, semester int32, filePath string) Response {
+	return a.LoadWaitlistSelection(year, semester, filePath)
 }
 
 func (a *App) FetchApprovedSelection() Response {
-	selection, err := a.sisu.FetchApprovedSelection()
+	cmd := commands.FetchSelectionCommand{
+		Kind: types.SelectionKindApproved,
+	}
+
+	selection, err := cmd.Execute(a.sisu.database)
 	if err != nil {
-		return Response{500, err.Error(), ""}
+		if errors.As(err, &database.ErrNotFound{}) {
+			return Response{200, "OK", nil}
+		}
+		return AppErrorToResponse(err)
 	}
 
 	return Response{200, "OK", selection}
 }
 
 func (a *App) FetchInterestedSelection() Response {
-	selection, err := a.sisu.FetchInterestedSelection()
+	cmd := commands.FetchSelectionCommand{
+		Kind: types.SelectionKindWaitlist,
+	}
+
+	selection, err := cmd.Execute(a.sisu.database)
 	if err != nil {
-		return Response{500, err.Error(), ""}
+		if errors.As(err, &database.ErrNotFound{}) {
+			return Response{200, "OK", nil}
+		}
+		return AppErrorToResponse(err)
 	}
 
 	return Response{200, "OK", selection}
 }
 
 func (a *App) FetchRollCalls() Response {
-	rollcalls, err := a.sisu.FetchRollcalls()
+	cmd := commands.FetchCallsCommand{}
+
+	calls, err := cmd.Execute(a.sisu.database)
 	if err != nil {
-		return Response{500, err.Error(), ""}
+		return AppErrorToResponse(err)
 	}
 
-	return Response{200, "OK", rollcalls}
-}
-
-func (a *App) FetchPeriods() Response {
-	periods, err := a.sisu.FetchPeriods()
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", periods}
-}
-
-func (a *App) FetchApplicationsByRollCall(id int64) Response {
-	applications, err := a.sisu.FetchApplicationsByRollCall(id)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", applications}
-}
-
-func (a *App) EnrollApplication(id int64) Response {
-	if err := a.sisu.EnrollApplication(id); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) ClearApplicationStatus(id int64) Response {
-	if err := a.sisu.ClearApplicationStatus(id); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) AbsentApplication(id int64) Response {
-	if err := a.sisu.AbsentApplication(id); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) CreateRollCall() Response {
-	if err := a.sisu.CreateRollCall(); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) WebsitePDF(rollcallID int64, periodID int64) Response {
-	period, err := a.sisu.FetchPeriodName(periodID)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	rollcall, err := a.sisu.FetchRollcallNumber(rollcallID)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	var options runtime.SaveDialogOptions
-	options.DefaultFilename = fmt.Sprintf("%s-site-chamada-%d.pdf", period, rollcall)
-
-	file, err := runtime.SaveFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	if err := a.sisu.WebsitePDF(rollcallID, periodID, file); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) ExportCSV() Response {
-	var options runtime.SaveDialogOptions
-	options.DefaultFilename = "alunos-aprovados.csv"
-
-	file, err := runtime.SaveFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	if err := a.sisu.ExportCSV(file); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) Backup() Response {
-	var options runtime.SaveDialogOptions
-	options.DefaultFilename = "backup.sisu"
-
-	file, err := runtime.SaveFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	if err := a.sisu.Backup(file); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) Restore() Response {
-	var filter runtime.FileFilter
-	filter.DisplayName = "Restore Backup"
-	filter.Pattern = "*.sisu"
-
-	var options runtime.OpenDialogOptions
-	options.Filters = []runtime.FileFilter{filter}
-
-	file, err := runtime.OpenFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	if err := a.sisu.Restore(file); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) EnrollmentPDF(rollcallID int64, periodID int64) Response {
-	period, err := a.sisu.FetchPeriodName(periodID)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	rollcall, err := a.sisu.FetchRollcallNumber(rollcallID)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	var options runtime.SaveDialogOptions
-	options.DefaultFilename = fmt.Sprintf("%s-matricula-chamada-%d.pdf", period, rollcall)
-
-	file, err := runtime.SaveFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	if err := a.sisu.EnrollmentPDF(rollcallID, periodID, file); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) EmailPDF(rollcallID int64, periodID int64) Response {
-	period, err := a.sisu.FetchPeriodName(periodID)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	rollcall, err := a.sisu.FetchRollcallNumber(rollcallID)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	var options runtime.SaveDialogOptions
-	options.DefaultFilename = fmt.Sprintf("%s-email-chamada-%d.pdf", period, rollcall)
-
-	file, err := runtime.SaveFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	if err := a.sisu.EmailPDF(rollcallID, periodID, file); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
-}
-
-func (a *App) TeacherPDF(periodID int64) Response {
-	period, err := a.sisu.FetchPeriodName(periodID)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	var options runtime.SaveDialogOptions
-	options.DefaultFilename = fmt.Sprintf("presenca-%s.pdf", period)
-
-	file, err := runtime.SaveFileDialog(a.ctx, options)
-	if err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	if err := a.sisu.TeacherPDF(periodID, file); err != nil {
-		return Response{500, err.Error(), ""}
-	}
-
-	return Response{200, "OK", ""}
+	return Response{200, "OK", calls}
 }
 
 func (a *App) DeleteApprovedSelection() Response {
-	if err := a.sisu.DeleteSelection(types.ApprovedSelection); err != nil {
-		return Response{500, err.Error(), ""}
+	cmd := commands.DeleteSelectionCommand{
+		Kind: types.SelectionKindApproved,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
 	}
 
 	return Response{200, "OK", ""}
 }
 
 func (a *App) DeleteInterestedSelection() Response {
-	if err := a.sisu.DeleteSelection(types.InterestedSelection); err != nil {
-		return Response{500, err.Error(), ""}
+	cmd := commands.DeleteSelectionCommand{
+		Kind: types.SelectionKindWaitlist,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
 	}
 
 	return Response{200, "OK", ""}
 }
 
-func (a *App) DeleteRollcall(id int64) Response {
-	if err := a.sisu.DeleteRollcall(id); err != nil {
-		return Response{500, err.Error(), ""}
+func (a *App) FetchRegistrations() Response {
+	cmd := commands.FetchRegistrationsCommand{}
+
+	registrations, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", registrations}
+}
+
+func (a *App) FetchRegistrationsBySelectionID(selectionID int32) Response {
+	cmd := commands.FetchRegistrationsCommand{
+		SelectionID: &selectionID,
+	}
+
+	registrations, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", registrations}
+}
+
+func (a *App) FetchRegistrationsByCourseID(courseID int32) Response {
+	cmd := commands.FetchRegistrationsCommand{
+		CourseID: &courseID,
+	}
+
+	registrations, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", registrations}
+}
+
+func (a *App) FetchRegistrationsByCallID(callID int32) Response {
+	cmd := commands.FetchRegistrationsCommand{
+		CallID: &callID,
+	}
+
+	registrations, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", registrations}
+}
+
+func (a *App) FetchRegistration(registrationID int32) Response {
+	cmd := commands.FetchRegistrationCommand{
+		RegistrationID: registrationID,
+	}
+
+	registration, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", registration}
+}
+
+func (a *App) CloseRollCall(id int32) Response {
+	cmd := commands.CloseCallCommand{
+		ID: id,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) EnrollRegistration(id int32) Response {
+	cmd := commands.UpdateRegistrationStatusCommand{
+		RegistrationID: id,
+		NewStatus:      types.RegistrationStatusEnrolled,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) AbsentRegistration(id int32) Response {
+	cmd := commands.UpdateRegistrationStatusCommand{
+		RegistrationID: id,
+		NewStatus:      types.RegistrationStatusAbsent,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) ClearRegistrationStatus(id int32) Response {
+	cmd := commands.UpdateRegistrationStatusCommand{
+		RegistrationID: id,
+		NewStatus:      types.RegistrationStatusApproved,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) EnrollApplication(id int32) Response {
+	return a.EnrollRegistration(id)
+}
+
+func (a *App) AbsentApplication(id int32) Response {
+	return a.AbsentRegistration(id)
+}
+
+func (a *App) ClearApplicationStatus(id int32) Response {
+	return a.ClearRegistrationStatus(id)
+}
+
+func (a *App) FetchApplicationsByRollCall(callID int32) Response {
+	return a.FetchRegistrationsByCallID(callID)
+}
+
+func (a *App) CreateRollCall() Response {
+	cmd := commands.CreateCallCommand{}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) OpenCall(id int32) Response {
+	cmd := commands.OpenCallCommand{
+		ID: id,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) DeleteCall(id int32) Response {
+	cmd := commands.DeleteCallCommand{
+		ID: id,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) OpenRollCall(id int32) Response {
+	return a.OpenCall(id)
+}
+
+func (a *App) DeleteRollCall(id int32) Response {
+	return a.DeleteCall(id)
+}
+
+func (a *App) DeleteRollcall(id int32) Response {
+	return a.DeleteCall(id)
+}
+
+func (a *App) WebsitePDF(callID int32, period string, filePath string) Response {
+	coursePeriod, err := types.ParseCoursePeriod(period)
+	if err != nil {
+		return Response{500, "Período inválido.", ""}
+	}
+
+	cmd := commands.CreateWebsitePDFCommand{
+		CallID:   callID,
+		Period:   coursePeriod,
+		FilePath: filePath,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) EnrollmentPDF(callID int32, period string, filePath string) Response {
+	coursePeriod, err := types.ParseCoursePeriod(period)
+	if err != nil {
+		return Response{500, "Período inválido.", ""}
+	}
+
+	cmd := commands.CreateEnrollmentPDFCommand{
+		CallID:   callID,
+		Period:   coursePeriod,
+		FilePath: filePath,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) EmailPDF(callID int32, period string, filePath string) Response {
+	coursePeriod, err := types.ParseCoursePeriod(period)
+	if err != nil {
+		return Response{500, "Período inválido.", ""}
+	}
+
+	cmd := commands.CreateEmailPDFCommand{
+		CallID:   callID,
+		Period:   coursePeriod,
+		FilePath: filePath,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) TeacherPDF(period string, filePath string) Response {
+	coursePeriod, err := types.ParseCoursePeriod(period)
+	if err != nil {
+		return Response{500, "Período inválido.", ""}
+	}
+
+	cmd := commands.CreateTeacherPDFCommand{
+		Period:   coursePeriod,
+		FilePath: filePath,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) ExportCSV(filePath string) Response {
+	cmd := commands.ExportCSVCommand{
+		FilePath: filePath,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) Backup(filePath string) Response {
+	cmd := commands.BackupCommand{
+		FilePath: filePath,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", ""}
+}
+
+func (a *App) Restore(filePath string) Response {
+	cmd := commands.RestoreCommand{
+		FilePath: filePath,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
 	}
 
 	return Response{200, "OK", ""}
@@ -374,12 +524,28 @@ func (a *App) Destroy() Response {
 
 	matched, err := regexp.MatchString(`(Ok|Yes)`, result)
 	if err != nil || !matched {
-		return Response{500, err.Error(), ""}
+		return Response{200, "OK", ""}
 	}
 
-	a.sisu.Destroy()
+	cmd := commands.DestroyCommand{}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return AppErrorToResponse(err)
+	}
 
 	runtime.Quit(a.ctx)
 
 	return Response{200, "OK", ""}
 }
+
+/*
+
+func (a *App) FetchPeriods() Response {
+	periods, err := a.sisu.FetchPeriods()
+	if err != nil {
+		return Response{500, err.Error(), ""}
+	}
+
+	return Response{200, "OK", periods}
+}
+*/

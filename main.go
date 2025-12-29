@@ -7,16 +7,17 @@ import (
 	"os"
 	"path"
 
-	"github.com/baldugus/sisu/repository"
+	"github.com/baldugus/sisu/database"
+	"github.com/go-jet/jet/v2/qrm"
+	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
 	"github.com/alecthomas/kong"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jmoiron/sqlx"
-	"github.com/wailsapp/wails/v2"
-	wailsoptions "github.com/wailsapp/wails/v2/pkg/options"
-	wailsassetserver "github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"go.uber.org/zap"
 	_ "modernc.org/sqlite"
 )
@@ -24,7 +25,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed repository/migrations
+//go:embed database/migrations
 var migrations embed.FS
 
 // This needs to be done somewhere else.
@@ -35,12 +36,13 @@ func main() {
 // FIXME: too long fsr.
 func run() int { //nolint: funlen
 	var CLI struct {
-		logFile  string `help:"Path to log file."        short:"o"`
-		logLevel string `help:"Log level."               short:"l" default:"error"` //nolint:tagalign
-		dbFile   string `help:"Path to sqlite database." short:"d"`
+		LogFile  string `help:"Path to log file."        short:"o"`
+		LogLevel string `help:"Log level."               short:"l" default:"error"` //nolint:tagalign
+		DBFile   string `help:"Path to sqlite database." short:"d"`
+		File     string `help:"file"                     short:"f"`
 	}
 
-	kong.Parse(&CLI)
+	kong.Parse(&CLI, kong.ConfigureHelp(kong.HelpOptions{Compact: true, Summary: false}))
 
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
@@ -49,68 +51,105 @@ func run() int { //nolint: funlen
 
 	configDir := path.Join(userConfigDir, "sisu")
 
-	if err := os.MkdirAll(configDir, 0o755); err != nil { //nolint: gomnd
+	if err := os.MkdirAll(configDir, 0o755); err != nil { //nolint: mnd
 		panic(err)
 	}
 
-	if CLI.logFile == "" {
-		CLI.logFile = path.Join(configDir, "sisu.log")
+	if CLI.LogFile == "" {
+		CLI.LogFile = path.Join(configDir, "sisu.log")
 	}
 
-	logger := configLogger(CLI.logFile, CLI.logLevel)
+	logger := configLogger(CLI.LogFile, CLI.LogLevel)
+	zap.ReplaceGlobals(logger)
 	defer func() { _ = logger.Sync() }()
 
 	logger.Info("starting")
 
-	if CLI.dbFile == "" {
-		CLI.dbFile = path.Join(configDir, "sisu.db")
+	if CLI.DBFile == "" {
+		CLI.DBFile = path.Join(configDir, "sisu.db")
 	}
 
-	sqliteDB, err := configDB(CLI.dbFile)
-	repositoryService := NewRepositoryService(CLI.dbFile, sqliteDB)
-	defer func() { _ = repositoryService.Close() }()
-
+	sqliteDB, err := configDB(CLI.DBFile)
 	if err != nil {
 		logger.Sugar().Errorw("config db", "error", err)
 
 		return 1
 	}
 
-	DB := repository.NewDB(sqliteDB)
-	applicantRepo := repository.NewApplicantRepository(DB)
-	applicationRepo := repository.NewApplicationRepository(DB)
-	classRepo := repository.NewClassRepository(DB)
-	rollcallRepo := repository.NewRollcallRepository(DB)
-	selectionRepo := repository.NewSelectionRepository(DB)
+	qrm.GlobalConfig.StrictScan = true
 
-	// defer applicationRepository.Close(sqliteDB)
+	newDB := database.NewDatabase(sqliteDB, CLI.DBFile)
+	defer func() { _ = newDB.Close() }()
 	sisu := SISU{
-		applicantRepo:   *applicantRepo,
-		applicationRepo: *applicationRepo,
-		classRepo:       *classRepo,
-		rollcallRepo:    *rollcallRepo,
-		selectionRepo:   *selectionRepo,
-		service:         repositoryService,
-		l:               logger.Sugar(),
+		database: newDB,
 	}
+
+	// --- CMD LoadSelectionCommand
+	/*
+		contents, err := os.ReadFile(CLI.File)
+		if err != nil {
+			panic(err)
+		}
+
+		cmd := commands.LoadSelectionCommand{
+			Year:     2025,
+			Semester: 1,
+			Path:     CLI.File,
+			Content:  contents,
+			Kind:     types.SelectionKindApproved,
+		}
+
+		if err := cmd.Execute(sisu.database); err != nil {
+			panic(err)
+		}
+	*/
+	// ---
+
+	// --- CMD Generic Fetch
+	//cmd := commands.FetchSelectionCommand{
+	//	Kind: types.SelectionKindApproved,
+	//}
+
+	//r, err := cmd.Execute(sisu.database)
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	//j, err := json.MarshalIndent(r, "", "\t")
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	//fmt.Println(string(j))
+
+	// ---
+
+	// --- CMD CloseCall
+	//cmd := commands.CloseCallCommand{
+	//	ID: 1,
+	//}
+	//err = cmd.Execute(sisu.database)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	var app App
 	app.sisu = sisu
 
-	var assetServerOptions wailsassetserver.Options
+	var assetServerOptions assetserver.Options
 	assetServerOptions.Assets = assets
 
-	// Create application with options
-	var options wailsoptions.App
-	options.Title = "sisu"
-	options.Width = 1024
-	options.Height = 768
-	options.AssetServer = &assetServerOptions
-	options.BackgroundColour = &wailsoptions.RGBA{R: 27, G: 38, B: 54, A: 1}
-	options.OnStartup = app.startup
-	options.Bind = []any{&app}
+	// Create application with wailsOptions
+	var wailsOptions options.App
+	wailsOptions.Title = "sisu"
+	wailsOptions.Width = 1024
+	wailsOptions.Height = 768
+	wailsOptions.AssetServer = &assetServerOptions
+	wailsOptions.BackgroundColour = &options.RGBA{R: 27, G: 38, B: 54, A: 1}
+	wailsOptions.OnStartup = app.startup
+	wailsOptions.Bind = []any{&app}
 
-	if err := wails.Run(&options); err != nil {
+	if err := wails.Run(&wailsOptions); err != nil {
 		logger.Sugar().Errorw("app start error", "error", err)
 	}
 
@@ -149,7 +188,7 @@ func configDB(dbFile string) (*sqlx.DB, error) {
 }
 
 func initDB(db *sqlx.DB) error {
-	filesystem, err := iofs.New(migrations, "repository/migrations")
+	filesystem, err := iofs.New(migrations, "database/migrations")
 	if err != nil {
 		return fmt.Errorf("new iofs: %w", err)
 	}

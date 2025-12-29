@@ -1,6 +1,7 @@
 package csvparser
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -8,41 +9,64 @@ import (
 )
 
 type ParsedCsv struct {
-	applicants []*csvApplicant
+	candidates []*csvCandidate
 	name       string
 }
 
-func (pc *ParsedCsv) ToApplications(status string) ([]*types.Application, error) {
-	applications := make([]*types.Application, len(pc.applicants))
+type ParsedRegistration struct {
+	Registration *types.Registration
+	Course       *types.Course
+	Call         *types.Call
+}
 
-	for i, applicant := range pc.applicants {
-		application, err := applicant.Parse(status)
+type ParsedSelection struct {
+	Selection     *types.Selection
+	Registrations []*ParsedRegistration
+}
+
+func (pc *ParsedCsv) toRegistrationsDomain(status types.RegistrationStatus) ([]*ParsedRegistration, error) {
+	registrations := make([]*ParsedRegistration, len(pc.candidates))
+
+	for i, candidate := range pc.candidates {
+		parsed, err := candidate.Parse(status)
 		if err != nil {
 			// Line: i + 1 assumes the first line in a csv file is headers
-			return nil, &MapperError{Line: i + 1, Err: err}
+			return nil, &ErrLineMapping{Line: i + 1, Err: err}
 		}
 
-		applications[i] = application
+		registrations[i] = parsed
 	}
 
-	return applications, nil
+	return registrations, nil
 }
 
-func (pc *ParsedCsv) ToSelection(kind types.SelectionKind, date string) types.Selection {
-	var selection types.Selection
-	selection.Name = pc.name
-	selection.Kind = kind
-
-	if len(pc.applicants) > 0 {
-		selection.Date = date
-		selection.Institution = pc.applicants[0].Institution
-		selection.Course = pc.applicants[0].Course
+func (pc *ParsedCsv) ToSelectionDomain(kind types.SelectionKind, year int32, semester int32) (*ParsedSelection, error) {
+	registrationStatus, _ := types.ParseRegistrationStatus(kind.ToRegistrationStatus().String())
+	registrations, err := pc.toRegistrationsDomain(registrationStatus)
+	if err != nil {
+		return nil, err
 	}
 
-	return selection
+	if len(pc.candidates) == 0 {
+		return nil, ErrNoRegistrationsFound{}
+	}
+
+	selection := &types.Selection{
+		Name:        pc.name,
+		Kind:        kind,
+		Year:        year,
+		Semester:    semester,
+		Institution: pc.candidates[0].Institution,
+		Degree:      pc.candidates[0].Course,
+	}
+
+	return &ParsedSelection{
+		Selection:     selection,
+		Registrations: registrations,
+	}, nil
 }
 
-type csvApplicant struct {
+type csvCandidate struct {
 	Stage                string `csv:"NU_ETAPA"`
 	SchedulePeriod       string `csv:"DS_TURNO"`
 	Seats                string `csv:"QT_VAGAS_CONCORRENCIA"`
@@ -80,107 +104,140 @@ type csvApplicant struct {
 
 // TODO: move all of these validations to a parser in the types package
 // when the database is decoupled from domain types
-func (a *csvApplicant) Parse(status string) (*types.Application, error) {
-	minimumScore, err := parseLocalizedFloat(a.MinimumScore)
+func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistration, error) {
+	period, err := parsePeriod(a.SchedulePeriod)
 	if err != nil {
-		return nil, &ValidationError{Field: "MinimumScore", Err: err}
+		return nil, &ErrFieldValidation{Field: "Period", Err: err}
 	}
 
-	seats, err := strconv.Atoi(a.Seats)
-	if err != nil {
-		return nil, &ValidationError{Field: "Seats", Err: err}
+	// The waitlist file has several MinimumScore and Ranking fields empt
+	// Should we only allow this in the waitlist file?
+	ms := a.MinimumScore
+	if a.MinimumScore == "" {
+		ms = "0"
 	}
 
-	option, err := strconv.Atoi(a.Option)
-	if err != nil {
-		return nil, &ValidationError{Field: "Option", Err: err}
+	r := a.Ranking
+	if a.Ranking == "" {
+		r = "0"
 	}
 
-	languagesScore, err := parseLocalizedFloat(a.LanguagesScore)
+	minimumScore, err := parseScoreString(ms)
 	if err != nil {
-		return nil, &ValidationError{Field: "LanguagesScore", Err: err}
+		return nil, &ErrFieldValidation{Field: "MinimumScore", Err: err}
 	}
 
-	humanitiesScore, err := parseLocalizedFloat(a.HumanitiesScore)
+	seats, err := strconv.ParseInt(a.Seats, 10, 32)
 	if err != nil {
-		return nil, &ValidationError{Field: "HumanitiesScore", Err: err}
+		return nil, &ErrFieldValidation{Field: "Seats", Err: err}
 	}
 
-	naturalSciencesScore, err := parseLocalizedFloat(a.NaturalSciencesScore)
+	option, err := strconv.ParseInt(a.Option, 10, 32)
 	if err != nil {
-		return nil, &ValidationError{Field: "NaturalSciencesScore", Err: err}
+		return nil, &ErrFieldValidation{Field: "Option", Err: err}
 	}
 
-	mathematicsScore, err := parseLocalizedFloat(a.MathematicsScore)
+	languagesScore, err := parseScoreString(a.LanguagesScore)
 	if err != nil {
-		return nil, &ValidationError{Field: "MathematicsScore", Err: err}
+		return nil, &ErrFieldValidation{Field: "LanguagesScore", Err: err}
 	}
 
-	essayScore, err := parseLocalizedFloat(a.EssayScore)
+	humanitiesScore, err := parseScoreString(a.HumanitiesScore)
 	if err != nil {
-		return nil, &ValidationError{Field: "EssayScore", Err: err}
+		return nil, &ErrFieldValidation{Field: "HumanitiesScore", Err: err}
 	}
 
-	compositeScore, err := parseLocalizedFloat(a.CompositeScore)
+	naturalSciencesScore, err := parseScoreString(a.NaturalSciencesScore)
 	if err != nil {
-		return nil, &ValidationError{Field: "CompositeScore", Err: err}
+		return nil, &ErrFieldValidation{Field: "NaturalSciencesScore", Err: err}
 	}
 
-	ranking, err := strconv.Atoi(a.Ranking)
+	mathematicsScore, err := parseScoreString(a.MathematicsScore)
 	if err != nil {
-		return nil, &ValidationError{Field: "Ranking", Err: err}
+		return nil, &ErrFieldValidation{Field: "MathematicsScore", Err: err}
 	}
 
-	return &types.Application{
-		ID:                   0,
-		Status:               status,
-		EnrollmentID:         a.EnrollmentID,
-		Option:               option,
-		LanguagesScore:       languagesScore,
-		HumanitiesScore:      humanitiesScore,
-		NaturalSciencesScore: naturalSciencesScore,
-		MathematicsScore:     mathematicsScore,
-		EssayScore:           essayScore,
-		CompositeScore:       compositeScore,
-		Ranking:              ranking,
-		Applicant: types.Applicant{
-			CPF:          a.CPF,
-			Name:         a.Name,
-			SocialName:   a.SocialName,
-			BirthDate:    a.BirthDate,
-			Sex:          a.Sex,
-			MotherName:   a.MotherName,
-			AddressLine:  a.AddressLine,
-			AddressLine2: a.AddressLine2,
-			HouseNumber:  a.HouseNumber,
-			Neighborhood: a.Neighborhood,
-			Municipality: a.Municipality,
-			State:        a.State,
-			CEP:          a.CEP,
-			Email:        a.Email,
-			Phone1:       a.Phone1,
-			Phone2:       a.Phone2,
+	essayScore, err := parseScoreString(a.EssayScore)
+	if err != nil {
+		return nil, &ErrFieldValidation{Field: "EssayScore", Err: err}
+	}
+
+	compositeScore, err := parseScoreString(a.CompositeScore)
+	if err != nil {
+		return nil, &ErrFieldValidation{Field: "CompositeScore", Err: err}
+	}
+
+	ranking, err := strconv.Atoi(r)
+	if err != nil {
+		return nil, &ErrFieldValidation{Field: "Ranking", Err: err}
+	}
+
+	var call *types.Call
+	if status == types.RegistrationStatusApproved {
+		call = &types.Call{}
+	}
+
+	return &ParsedRegistration{
+		Registration: &types.Registration{
+			Status:               status,
+			EnrollmentID:         a.EnrollmentID,
+			Option:               int32(option),
+			LanguagesScore:       languagesScore,
+			HumanitiesScore:      humanitiesScore,
+			NaturalSciencesScore: naturalSciencesScore,
+			MathematicsScore:     mathematicsScore,
+			EssayScore:           essayScore,
+			CompositeScore:       compositeScore,
+			Ranking:              int32(ranking),
+			Candidate: &types.Candidate{
+				CPF:          a.CPF,
+				Name:         a.Name,
+				SocialName:   a.SocialName,
+				BirthDate:    a.BirthDate,
+				Sex:          a.Sex,
+				MotherName:   a.MotherName,
+				AddressLine:  a.AddressLine,
+				AddressLine2: a.AddressLine2,
+				HouseNumber:  a.HouseNumber,
+				Neighborhood: a.Neighborhood,
+				Municipality: a.Municipality,
+				State:        a.State,
+				CEP:          a.CEP,
+				Email:        a.Email,
+				Phone1:       a.Phone1,
+				Phone2:       a.Phone2,
+			},
 		},
-		Class: types.Class{
-			ID: 0,
-			Period: types.Period{
-				Name: a.SchedulePeriod,
-			},
-			Quota: types.Quota{
-				Name: a.Quota,
-			},
-			Seats:        seats,
+		Course: &types.Course{
+			Period:       *period,
+			Quota:        a.Quota,
+			Seats:        int32(seats),
 			MinimumScore: minimumScore,
 		},
+		Call: call,
 	}, nil
-
 }
 
-func parseLocalizedFloat(s string) (float64, error) {
-	score, err := strconv.ParseFloat(strings.ReplaceAll(s, ",", "."), 64)
+func parseScoreString(value string) (*types.Score, error) {
+	scoreFloat, err := strconv.ParseFloat(strings.ReplaceAll(value, ",", "."), 32)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return score, nil
+	score := types.NewScoreFromFloat(float32(scoreFloat))
+
+	return &score, nil
+}
+
+func parsePeriod(name string) (*types.CoursePeriod, error) {
+	periods := map[string]types.CoursePeriod{
+		"Matutino": types.CoursePeriodMorning,
+		"Noturno":  types.CoursePeriodEvening,
+	}
+
+	if x, ok := periods[name]; ok {
+		return &x, nil
+	}
+
+	return nil, fmt.Errorf("%s is %w", name, ErrInvalidPeriod{Period: name})
 }

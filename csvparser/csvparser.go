@@ -13,20 +13,35 @@ import (
 	"github.com/gocarina/gocsv"
 )
 
-func ParseFile(path string) (*ParsedCsv, error) {
+func ParseBytes(content []byte, path string) (*ParsedCsv, error) {
+	r := bytes.NewReader(content)
+	parsedCsv, err := Parse(r, path)
+	if err != nil {
+		return nil, fmt.Errorf("parsing csv: %w", err)
+	}
+
+	return parsedCsv, nil
+}
+
+func ParseFile(path string) (p *ParsedCsv, err error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, &FileNotFoundError{Path: path, Err: err}
+			return nil, &ErrFileNotFound{Path: path, Err: err}
 		}
 
 		if errors.Is(err, os.ErrPermission) {
-			return nil, &PermissionDeniedError{Path: path, Err: err}
+			return nil, &ErrPermissionDenied{Path: path, Err: err}
 		}
 
-		return nil, &FileError{Path: path, Err: err}
+		return nil, &ErrFileOpen{Path: path, Err: err}
 	}
-	defer file.Close()
+
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	parsedCsv, err := Parse(file, file.Name())
 	if err != nil {
@@ -53,17 +68,17 @@ func Parse(reader io.Reader, name string) (*ParsedCsv, error) {
 		return c
 	})
 
-	applicants := []*csvApplicant{}
+	candidates := []*csvCandidate{}
 
-	if err := gocsv.Unmarshal(sanitizedReader, &applicants); err != nil {
+	if err := gocsv.Unmarshal(sanitizedReader, &candidates); err != nil {
 		if errors.Is(err, gocsv.ErrEmptyCSVFile) {
-			return nil, &EmptyError{Err: err}
+			return nil, &ErrFileEmpty{Err: err}
 		}
 
-		return nil, &ParseError{Err: err}
+		return nil, &ErrFileParse{Err: err}
 	}
 
-	return &ParsedCsv{applicants: applicants, name: name}, nil
+	return &ParsedCsv{candidates: candidates, name: name}, nil
 }
 
 /*
@@ -82,7 +97,7 @@ the source file, so we have to deal with it.
 func sanitizeCsv(reader io.Reader) (io.Reader, error) {
 	rawCsv, err := io.ReadAll(utfbom.SkipOnly(reader))
 	if err != nil {
-		return nil, &ReadError{Err: err}
+		return nil, &ErrFileRead{Err: err}
 	}
 
 	lines := strings.Split(string(rawCsv), "\r")

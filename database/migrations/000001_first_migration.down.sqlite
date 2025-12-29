@@ -1,0 +1,8 @@
+DROP TABLE registrations;
+DROP TABLE candidates;
+DROP INDEX idx_course_time_slot_quota;
+DROP TABLE courses;
+DROP TABLE quotas;
+DROP INDEX idx_one_active_call;
+DROP TABLE calls;
+DROP TABLE selections;

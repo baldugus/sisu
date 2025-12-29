@@ -14,26 +14,24 @@ import (
 
 func createMockSelection() *types.Selection {
 	return &types.Selection{
-		ID:          1,
 		Name:        "Seleção de Teste",
-		Kind:        1, // ApprovedSelection
-		Date:        "2025-01-01T00:00:00Z",
+		Kind:        types.SelectionKindApproved,
+		Year:        2025,
+		Semester:    1,
 		Institution: "FAETERJ-Rio",
-		Course:      "Análise e Desenvolvimento de Sistemas",
+		Degree:      "Análise e Desenvolvimento de Sistemas",
 	}
 }
 
-func createMockApplications() types.Applications {
-	return types.Applications{
+func createMockRegistrations() types.Registrations {
+	return types.Registrations{
 		{
-			ID:             1,
-			Status:         "APPROVED",
+			Status:         types.RegistrationStatusApproved,
 			EnrollmentID:   "123456789",
 			Option:         1,
-			CompositeScore: 850.5,
+			CompositeScore: &types.Score{Value: 85050},
 			Ranking:        1,
-			Applicant: types.Applicant{
-				ID:        1,
+			Candidate: &types.Candidate{
 				Name:      "João Silva",
 				Email:     "joao.silva@exemplo.com",
 				CPF:       "12345678901",
@@ -41,14 +39,12 @@ func createMockApplications() types.Applications {
 			},
 		},
 		{
-			ID:             2,
-			Status:         "APPROVED",
+			Status:         types.RegistrationStatusApproved,
 			EnrollmentID:   "987654321",
 			Option:         1,
-			CompositeScore: 820.3,
+			CompositeScore: &types.Score{Value: 82030},
 			Ranking:        2,
-			Applicant: types.Applicant{
-				ID:        2,
+			Candidate: &types.Candidate{
 				Name:      "Maria Santos",
 				Email:     "maria.santos@exemplo.com",
 				CPF:       "98765432109",
@@ -58,23 +54,23 @@ func createMockApplications() types.Applications {
 	}
 }
 
-func createMockClassInfo() []*ClassInfo {
-	apps := createMockApplications()
-	return []*ClassInfo{
-		NewClassInfo("Ampla concorrência", apps),
+func createMockCourseInfo() []*CourseInfo {
+	registrations := createMockRegistrations()
+	return []*CourseInfo{
+		NewCourseInfo("Ampla concorrência", registrations),
 	}
 }
 
 func createMockSelectionInfo() *SelectionInfo {
 	sel := createMockSelection()
-	return NewSelectionInfo(sel, "2025", "1", 0)
+	return NewSelectionInfo(sel, 0)
 }
 
 func createMockBuilder() *Builder {
 	return &Builder{
 		Period:    "Manhã",
 		Selection: createMockSelectionInfo(),
-		Classes:   createMockClassInfo(),
+		Courses:   createMockCourseInfo(),
 	}
 }
 

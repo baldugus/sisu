@@ -2,34 +2,34 @@ package pdfbuilder
 
 import "github.com/baldugus/sisu/types"
 
-type ClassInfo struct {
-	Quota        string
-	Applications types.Applications
+type CourseInfo struct {
+	Quota         string
+	Registrations types.Registrations
 }
 
-func NewClassInfo(quota string, applications types.Applications) *ClassInfo {
-	return &ClassInfo{
-		Quota:        quota,
-		Applications: applications,
+func NewCourseInfo(quota string, registrations types.Registrations) *CourseInfo {
+	return &CourseInfo{
+		Quota:         quota,
+		Registrations: registrations,
 	}
 }
 
 type SelectionInfo struct {
 	Institution string
 	Kind        SelectionKind
-	Year        string
-	Semester    string
+	Year        int32
+	Semester    int32
 	Course      string
 	WaitlistNum int64
 }
 
-func NewSelectionInfo(selection *types.Selection, year string, semester string, waitlistNum int64) *SelectionInfo {
+func NewSelectionInfo(selection *types.Selection, waitlistNum int64) *SelectionInfo {
 	return &SelectionInfo{
 		Institution: selection.Institution,
 		Kind:        mapSelectionKind(selection.Kind),
-		Year:        year,
-		Semester:    semester,
-		Course:      selection.Course,
+		Year:        selection.Year,
+		Semester:    selection.Semester,
+		Course:      selection.Degree,
 		WaitlistNum: waitlistNum,
 	}
 }
@@ -42,7 +42,7 @@ const (
 )
 
 func mapSelectionKind(kind types.SelectionKind) SelectionKind {
-	if kind == 1 {
+	if kind == types.SelectionKindApproved {
 		return RegularCall
 	}
 
