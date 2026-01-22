@@ -196,6 +196,25 @@ func DeleteCall(db qrm.DB, ID int32) error {
 	return err
 }
 
+func (d *Database) FetchCallByNumber(callNumber int32) (*types.Call, error) {
+	stmt := SELECT(
+		Calls.AllColumns,
+	).FROM(
+		Calls,
+	).WHERE(
+		Calls.Number.EQ(Int32(callNumber)),
+	)
+
+	var result model.Calls
+
+	err := stmt.Query(d.db, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return toCallDomain(&result), nil
+}
+
 func DeleteAllCalls(db qrm.DB) error {
 	stmt := Calls.DELETE().
 		WHERE(Bool(true))
