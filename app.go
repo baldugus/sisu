@@ -80,6 +80,8 @@ func AppErrorToResponse(err error) Response {
 		return Response{500, "Não é possível excluir a seleção quando a primeira chamada está fechada.", ""}
 	case errors.As(err, &commands.ErrCannotDeleteCallWithLaterCalls{}):
 		return Response{500, "Não é possível excluir a chamada enquanto existem chamadas posteriores.", ""}
+	case errors.As(err, &commands.ErrCannotDeleteClosedCall{}):
+		return Response{500, "Não é possível excluir uma chamada fechada.", ""}
 	default:
 		zap.L().Error("unknown error", zap.Error(err))
 		return Response{500, "Erro desconhecido. Contate o desenvolvedor.", ""}
@@ -96,6 +98,7 @@ type App struct {
 // so we can call the runtime methods.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	zap.L().Info("application window ready")
 }
 
 // OpenFileDialog opens a file picker dialog and returns the selected file path.

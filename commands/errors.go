@@ -107,3 +107,9 @@ type ErrCannotDeleteCallWithLaterCalls struct{}
 func (e ErrCannotDeleteCallWithLaterCalls) Error() string {
 	return "cannot delete call while there are calls after it"
 }
+
+type ErrCannotDeleteClosedCall struct{}
+
+func (e ErrCannotDeleteClosedCall) Error() string {
+	return "cannot delete a closed call"
+}

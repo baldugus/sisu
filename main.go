@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/baldugus/sisu/database"
 	"github.com/go-jet/jet/v2/qrm"
@@ -19,6 +20,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	_ "modernc.org/sqlite"
 )
 
@@ -37,7 +39,7 @@ func main() {
 func run() int { //nolint: funlen
 	var CLI struct {
 		LogFile  string `help:"Path to log file."        short:"o"`
-		LogLevel string `help:"Log level."               short:"l" default:"error"` //nolint:tagalign
+		LogLevel string `help:"Log level."               short:"l" default:"info"` //nolint:tagalign
 		DBFile   string `help:"Path to sqlite database." short:"d"`
 		File     string `help:"file"                     short:"f"`
 	}
@@ -63,18 +65,24 @@ func run() int { //nolint: funlen
 	zap.ReplaceGlobals(logger)
 	defer func() { _ = logger.Sync() }()
 
-	logger.Info("starting")
+	logger.Info("SISU application starting",
+		zap.String("log_file", CLI.LogFile),
+		zap.String("log_level", CLI.LogLevel),
+		zap.String("config_dir", configDir),
+	)
 
 	if CLI.DBFile == "" {
 		CLI.DBFile = path.Join(configDir, "sisu.db")
 	}
 
+	logger.Info("initializing database", zap.String("db_file", CLI.DBFile))
 	sqliteDB, err := configDB(CLI.DBFile)
 	if err != nil {
 		logger.Sugar().Errorw("config db", "error", err)
 
 		return 1
 	}
+	logger.Info("database initialized successfully")
 
 	qrm.GlobalConfig.StrictScan = true
 
@@ -149,10 +157,13 @@ func run() int { //nolint: funlen
 	wailsOptions.OnStartup = app.startup
 	wailsOptions.Bind = []any{&app}
 
+	logger.Info("starting Wails application")
 	if err := wails.Run(&wailsOptions); err != nil {
 		logger.Sugar().Errorw("app start error", "error", err)
+		return 1
 	}
 
+	logger.Info("application shutdown complete")
 	return 0
 }
 
@@ -164,8 +175,19 @@ func configLogger(logFile string, logLevel string) *zap.Logger {
 
 	cfg := zap.NewProductionConfig()
 
-	cfg.OutputPaths = []string{"stdout", logFile}
-	cfg.ErrorOutputPaths = []string{"stderr", logFile}
+	// Use human-readable timestamp format instead of epoch
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	// On Windows, GUI apps launched via .exe don't have stdout/stderr attached
+	// Writing to them causes errors, so only write to the log file
+	if runtime.GOOS == "windows" {
+		cfg.OutputPaths = []string{logFile}
+		cfg.ErrorOutputPaths = []string{logFile}
+	} else {
+		cfg.OutputPaths = []string{"stdout", logFile}
+		cfg.ErrorOutputPaths = []string{"stderr", logFile}
+	}
+
 	cfg.Level = level
 
 	return zap.Must(cfg.Build())
@@ -180,6 +202,12 @@ func configDB(dbFile string) (*sqlx.DB, error) {
 		return nil, fmt.Errorf("sqlx open: %w", err)
 	}
 
+	// Configure connection pool for SQLite
+	// SQLite works best with a single connection to avoid database locking
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
+
 	if err := initDB(db); err != nil {
 		return nil, fmt.Errorf("init repository: %w", err)
 	}
@@ -188,6 +216,7 @@ func configDB(dbFile string) (*sqlx.DB, error) {
 }
 
 func initDB(db *sqlx.DB) error {
+	zap.L().Info("running database migrations")
 	filesystem, err := iofs.New(migrations, "database/migrations")
 	if err != nil {
 		return fmt.Errorf("new iofs: %w", err)
@@ -208,6 +237,8 @@ func initDB(db *sqlx.DB) error {
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migrate up: %w", err)
 	}
+
+	zap.L().Info("database migrations completed")
 
 	return nil
 }
