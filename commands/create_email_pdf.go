@@ -44,7 +44,13 @@ func (cmd *CreateEmailPDFCommand) Execute(db *database.Database) error {
 		courseInfos = append(courseInfos, pdfbuilder.NewCourseInfo(course.Quota, registrations))
 	}
 
-	selectionInfo := pdfbuilder.NewSelectionInfo(selection, int64(call.Number))
+	// Calculate waitlist number (call 1 = regular, call 2 = waitlist 1, etc.)
+	waitlistNum := int64(0)
+	if call.Number > 1 {
+		waitlistNum = int64(call.Number - 1)
+	}
+
+	selectionInfo := pdfbuilder.NewSelectionInfo(selection, waitlistNum)
 
 	builder := &pdfbuilder.Builder{
 		Period:    coursePeriodToPortuguese(cmd.Period),

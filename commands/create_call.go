@@ -42,7 +42,7 @@ func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 		totalAvailableSeats := int32(0)
 
 		for _, course := range courses {
-			occupiedSeats, err := db.CountCourseOccupiedSeats(course.ID)
+			occupiedSeats, err := database.CountCourseOccupiedSeats(tx, course.ID)
 			if err != nil {
 				return err
 			}
@@ -54,7 +54,7 @@ func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 
 			totalAvailableSeats += availableSeats
 
-			registrationIDs, err := db.FetchWaitlistedRegistrationsByCourse(course.ID, availableSeats)
+			registrationIDs, err := database.FetchWaitlistedRegistrationsByCourse(tx, course.ID, availableSeats)
 			if err != nil {
 				return err
 			}

@@ -268,7 +268,7 @@ func (d *Database) FetchSelectionKindByRegistrationID(registrationID int32) (typ
 	return types.ParseSelectionKind(result.Kind)
 }
 
-func (d *Database) CountCourseOccupiedSeats(courseID int32) (int32, error) {
+func CountCourseOccupiedSeats(db qrm.DB, courseID int32) (int32, error) {
 	stmt := SELECT(
 		COUNT(Registrations.ID).AS("count"),
 	).FROM(
@@ -285,7 +285,7 @@ func (d *Database) CountCourseOccupiedSeats(courseID int32) (int32, error) {
 		Count int32
 	}
 
-	err := stmt.Query(d.db, &result)
+	err := stmt.Query(db, &result)
 	if err != nil {
 		return 0, err
 	}
@@ -304,7 +304,7 @@ func (d *Database) UpdateRegistrationStatus(registrationID int32, status types.R
 	return err
 }
 
-func (d *Database) FetchWaitlistedRegistrationsByCourse(courseID int32, limit int32) ([]int32, error) {
+func FetchWaitlistedRegistrationsByCourse(db qrm.DB, courseID int32, limit int32) ([]int32, error) {
 	stmt := SELECT(
 		Registrations.ID,
 	).FROM(
@@ -318,7 +318,7 @@ func (d *Database) FetchWaitlistedRegistrationsByCourse(courseID int32, limit in
 
 	var result []int32
 
-	err := stmt.Query(d.db, &result)
+	err := stmt.Query(db, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -356,4 +356,22 @@ func DeleteAllRegistrations(db qrm.DB) error {
 
 	_, err := stmt.Exec(db)
 	return err
+}
+
+func FetchCandidateIDsBySelectionID(db qrm.DB, selectionID int32) ([]int32, error) {
+	stmt := SELECT(
+		Registrations.CandidateID,
+	).DISTINCT().FROM(
+		Registrations,
+	).WHERE(
+		Registrations.SelectionID.EQ(Int32(selectionID)),
+	)
+
+	var candidateIDs []int32
+	err := stmt.Query(db, &candidateIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return candidateIDs, nil
 }

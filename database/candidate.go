@@ -29,3 +29,34 @@ func DeleteAllCandidates(db qrm.DB) error {
 	_, err := stmt.Exec(db)
 	return err
 }
+
+func DeleteCandidatesBySelectionID(db qrm.DB, selectionID int32) error {
+	// Delete candidates that are linked to registrations in this selection
+	stmt := Candidates.DELETE().
+		WHERE(Candidates.ID.IN(
+			SELECT(Registrations.CandidateID).
+				FROM(Registrations).
+				WHERE(Registrations.SelectionID.EQ(Int32(selectionID))),
+		))
+
+	_, err := stmt.Exec(db)
+	return err
+}
+
+func DeleteCandidatesByIDs(db qrm.DB, candidateIDs []int32) error {
+	if len(candidateIDs) == 0 {
+		return nil
+	}
+
+	// Convert []int32 to []Expression for IN clause
+	ids := make([]Expression, len(candidateIDs))
+	for i, id := range candidateIDs {
+		ids[i] = Int32(id)
+	}
+
+	stmt := Candidates.DELETE().
+		WHERE(Candidates.ID.IN(ids...))
+
+	_, err := stmt.Exec(db)
+	return err
+}
