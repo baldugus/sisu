@@ -2,6 +2,7 @@ package commands
 
 import (
 	"github.com/baldugus/sisu/database"
+	"github.com/baldugus/sisu/types"
 	"github.com/go-jet/jet/v2/qrm"
 )
 
@@ -10,12 +11,17 @@ type DeleteCallCommand struct {
 }
 
 func (cmd *DeleteCallCommand) Execute(db *database.Database) error {
-	callNumber, err := db.GetCallNumber(cmd.ID)
+	call, err := db.FetchCallByID(cmd.ID)
 	if err != nil {
 		return err
 	}
 
-	hasCallAfter, err := db.HasCallAfterNumber(callNumber)
+	// Cannot delete a closed call
+	if call.Status == types.CallStatusDone {
+		return ErrCannotDeleteClosedCall{}
+	}
+
+	hasCallAfter, err := db.HasCallAfterNumber(call.Number)
 	if err != nil {
 		return err
 	}

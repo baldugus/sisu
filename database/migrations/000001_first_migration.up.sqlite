@@ -72,5 +72,5 @@ CREATE TABLE registrations (
   status                 TEXT NOT NULL CHECK (status IN ('approved', 'waitlisted', 'absent', 'enrolled')),
   selection_id           INTEGER NOT NULL REFERENCES selections ON DELETE RESTRICT ON UPDATE RESTRICT,
   call_id                INTEGER DEFAULT NULL REFERENCES calls ON DELETE SET NULL ON UPDATE RESTRICT,
-  candidate_id           INTEGER NOT NULL REFERENCES candidates ON DELETE RESTRICT ON UPDATE RESTRICT
+  candidate_id           INTEGER NOT NULL REFERENCES candidates ON DELETE CASCADE ON UPDATE RESTRICT
 );
