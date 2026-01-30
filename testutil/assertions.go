@@ -56,7 +56,7 @@ func AssertCourseOccupiedSeats(
 ) {
 	t.Helper()
 
-	occupied, err := db.CountCourseOccupiedSeats(courseID)
+	occupied, err := database.CountCourseOccupiedSeats(db.DB(), courseID)
 	require.NoError(t, err)
 	assert.Equal(t, expectedOccupied, occupied,
 		"course %d should have %d occupied seats", courseID, expectedOccupied)

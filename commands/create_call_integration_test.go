@@ -108,7 +108,7 @@ func TestCreateCall_PromotesCorrectNumberOfStudents(t *testing.T) {
 
 	totalAvailableSeats := int32(0)
 	for _, course := range courses {
-		occupied, err := db.CountCourseOccupiedSeats(course.ID)
+		occupied, err := database.CountCourseOccupiedSeats(db.DB(), course.ID)
 		require.NoError(t, err)
 		available := course.Seats - occupied
 		if available > 0 {
