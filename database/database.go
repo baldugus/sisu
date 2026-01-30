@@ -25,6 +25,12 @@ func (d *Database) Close() error {
 	return d.db.Close()
 }
 
+// DB returns the underlying qrm.DB interface for use in functions that accept it.
+// This is primarily used in tests.
+func (d *Database) DB() qrm.DB {
+	return d.db
+}
+
 func (d *Database) Destroy() error {
 	if err := d.db.Close(); err != nil {
 		return fmt.Errorf("close db: %w", err)

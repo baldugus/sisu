@@ -160,3 +160,29 @@ func TestBuildTeacherPdf_Golden(t *testing.T) {
 
 	generateAndCompareGolden(t, pdfPath, goldenPath)
 }
+
+func TestBuildWebsitePdf_Waitlist_Golden(t *testing.T) {
+	sel := &types.Selection{
+		Name:        "Seleção de Teste - Lista de Espera",
+		Kind:        types.SelectionKindWaitlist,
+		Year:        2025,
+		Semester:    1,
+		Institution: "FAETERJ-Rio",
+		Degree:      "Análise e Desenvolvimento de Sistemas",
+	}
+
+	builder := &Builder{
+		Period:    "Manhã",
+		Selection: NewSelectionInfo(sel, 1),
+		Courses:   createMockCourseInfo(),
+	}
+
+	pdfPath := filepath.Join(t.TempDir(), "website_waitlist.pdf")
+	goldenPath := "testdata/website_waitlist_golden.png"
+
+	if err := builder.BuildWebsitePdf(pdfPath); err != nil {
+		t.Fatalf("Failed to build waitlist website PDF: %v", err)
+	}
+
+	generateAndCompareGolden(t, pdfPath, goldenPath)
+}
