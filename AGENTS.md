@@ -298,6 +298,38 @@ db.RunInTx(func(tx qrm.DB) error {
 })
 ```
 
+#### CASCADE DELETE and Referential Integrity
+
+**IMPORTANT**: Registrations are NEVER deleted directly. The database enforces CASCADE DELETE:
+
+```sql
+-- registrations.candidate_id foreign key has ON DELETE CASCADE
+candidate_id INTEGER NOT NULL REFERENCES candidates ON DELETE CASCADE
+```
+
+**Deletion Pattern:**
+- Delete candidates → Database automatically cascades to delete their registrations
+- Never call `DeleteRegistrations*()` functions when deleting selections
+- Only `Candidates → Registrations` uses CASCADE (tightly coupled entities)
+- All other relationships use RESTRICT (explicit control required)
+
+**Rationale:**
+- Candidates and registrations are essentially the same data split for organization
+- Prevents orphaned registrations at the database level
+- Simplifies deletion logic and prevents bugs
+- Maintains explicit control over other relationships (selections, courses, calls)
+
+**Example:**
+```go
+// CORRECT - Delete candidates, CASCADE handles registrations
+candidateIDs, _ := database.FetchCandidateIDsBySelectionID(tx, selectionID)
+database.DeleteCandidatesByIDs(tx, candidateIDs)  // Registrations auto-deleted
+
+// WRONG - Never delete registrations directly in selection deletion
+database.DeleteRegistrationsBySelectionID(tx, selectionID)  // Function doesn't exist
+database.DeleteCandidatesByIDs(tx, candidateIDs)
+```
+
 ### Command Layer (`commands/`)
 
 Commands orchestrate business logic and transactions. Example flow for `LoadSelectionCommand`:
