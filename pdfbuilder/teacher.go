@@ -47,7 +47,7 @@ func (t TeacherItem) GetHeader() core.Row {
 
 type TeacherRenderer struct{}
 
-func (t *TeacherRenderer) Render(classes []*ClassInfo) ([]core.Row, error) {
+func (t *TeacherRenderer) Render(courses []*CourseInfo) ([]core.Row, error) {
 	var titleText props.Text
 	titleText.Top = 10
 	titleText.Style = fontstyle.Bold
@@ -55,15 +55,20 @@ func (t *TeacherRenderer) Render(classes []*ClassInfo) ([]core.Row, error) {
 
 	var rows []core.Row
 
-	for _, class := range classes {
-		sort.Sort(class.Applications)
+	for _, course := range courses {
+		// Skip courses with no registrations
+		if len(course.Registrations) == 0 {
+			continue
+		}
+
+		sort.Sort(course.Registrations)
 
 		var items []TeacherItem
 
-		rows = append(rows, text.NewRow(20, class.Quota, titleText))
+		rows = append(rows, text.NewRow(20, course.Quota, titleText))
 
-		for i, application := range class.Applications {
-			item := newTeacherItem(i+1, application.Applicant.Name)
+		for i, registration := range course.Registrations {
+			item := newTeacherItem(i+1, registration.Candidate.Name)
 			items = append(items, item)
 		}
 
@@ -81,8 +86,8 @@ func (t *TeacherRenderer) Render(classes []*ClassInfo) ([]core.Row, error) {
 func (t *TeacherRenderer) header(selection *SelectionInfo, period string) []core.Row {
 	var header strings.Builder
 
-	header.WriteString(fmt.Sprintf("LISTA DE PRESENÇA - %s %s", selection.Institution, selection.Year))
-	header.WriteString(fmt.Sprintf(".%s", selection.Semester))
+	header.WriteString(fmt.Sprintf("LISTA DE PRESENÇA - %s %d", selection.Institution, selection.Year))
+	header.WriteString(fmt.Sprintf(".%d", selection.Semester))
 	period = fmt.Sprintf("TURNO: %s", period)
 
 	var textStyle props.Text
@@ -99,7 +104,7 @@ func (t *TeacherRenderer) header(selection *SelectionInfo, period string) []core
 
 	rows = append(rows, text.NewRow(7, "DISCIPLINA:", textStyle))
 	rows = append(rows, text.NewRow(7, "PROFESSOR:", textStyle))
-	rows = append(rows, text.NewRow(7, fmt.Sprintf("DATA: ____/____/%s", selection.Year), textStyle))
+	rows = append(rows, text.NewRow(7, fmt.Sprintf("DATA: ____/____/%d", selection.Year), textStyle))
 
 	return rows
 }

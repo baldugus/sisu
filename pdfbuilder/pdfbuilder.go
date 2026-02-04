@@ -9,15 +9,15 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/core"
 )
 
-type ApplicationRenderer interface {
-	Render(classes []*ClassInfo) ([]core.Row, error)
+type RegistrationRenderer interface {
+	Render(courses []*CourseInfo) ([]core.Row, error)
 	header(*SelectionInfo, string) []core.Row
 }
 
 type Builder struct {
 	Period    string
 	Selection *SelectionInfo
-	Classes   []*ClassInfo
+	Courses   []*CourseInfo
 }
 
 func (b *Builder) BuildWebsitePdf(file string) error {
@@ -36,7 +36,7 @@ func (b *Builder) BuildTeacherPdf(file string) error {
 	return b.buildToFile(&TeacherRenderer{}, orientation.Horizontal, file)
 }
 
-func (b *Builder) buildToFile(renderer ApplicationRenderer, orientation orientation.Type, file string) error {
+func (b *Builder) buildToFile(renderer RegistrationRenderer, orientation orientation.Type, file string) error {
 	pdf, err := b.build(renderer, orientation)
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func (b *Builder) buildToFile(renderer ApplicationRenderer, orientation orientat
 	return nil
 }
 
-func (b *Builder) build(renderer ApplicationRenderer, orientation orientation.Type) (core.Document, error) {
+func (b *Builder) build(renderer RegistrationRenderer, orientation orientation.Type) (core.Document, error) {
 	config := config.NewBuilder().WithOrientation(orientation)
 	builder := maroto.New(config.Build())
 
@@ -58,7 +58,7 @@ func (b *Builder) build(renderer ApplicationRenderer, orientation orientation.Ty
 		return nil, fmt.Errorf("register header: %w", err)
 	}
 
-	rows, err := renderer.Render(b.Classes)
+	rows, err := renderer.Render(b.Courses)
 	if err != nil {
 		return nil, fmt.Errorf("applications to website: %w", err)
 	}

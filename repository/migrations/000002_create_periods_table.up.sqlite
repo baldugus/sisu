@@ -1,6 +1,0 @@
-CREATE TABLE periods (
-  id   INTEGER PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE
-);
-
-CREATE INDEX idx_periods_name ON periods(name);

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/baldugus/sisu/types"
 	"github.com/johnfercher/maroto/v2/pkg/components/list"
 	"github.com/johnfercher/maroto/v2/pkg/components/row"
 	"github.com/johnfercher/maroto/v2/pkg/components/text"
@@ -17,11 +18,11 @@ import (
 type WebsiteItem struct {
 	order        int
 	name         string
-	score        float64
+	score        *types.Score
 	enrollmentID string
 }
 
-func newWebsiteItem(order int, name string, score float64, enrollmentID string) WebsiteItem {
+func newWebsiteItem(order int, name string, score *types.Score, enrollmentID string) WebsiteItem {
 	return WebsiteItem{
 		order:        order,
 		name:         name,
@@ -46,14 +47,14 @@ func (w WebsiteItem) GetContent(_ int) core.Row {
 	return row.New(5).Add(
 		text.NewCol(1, fmt.Sprint(w.order)),
 		text.NewCol(7, w.name),
-		text.NewCol(1, fmt.Sprintf("%.2f", w.score)),
+		text.NewCol(1, fmt.Sprint(w.score)),
 		text.NewCol(3, w.enrollmentID),
 	)
 }
 
 type WebsiteRenderer struct{}
 
-func (w *WebsiteRenderer) Render(classes []*ClassInfo) ([]core.Row, error) {
+func (w *WebsiteRenderer) Render(courses []*CourseInfo) ([]core.Row, error) {
 	var titleText props.Text
 	titleText.Top = 10
 	titleText.Style = fontstyle.Bold
@@ -61,15 +62,20 @@ func (w *WebsiteRenderer) Render(classes []*ClassInfo) ([]core.Row, error) {
 
 	var rows []core.Row
 
-	for _, class := range classes {
-		sort.Sort(class.Applications)
+	for _, course := range courses {
+		// Skip courses with no registrations
+		if len(course.Registrations) == 0 {
+			continue
+		}
+
+		sort.Sort(course.Registrations)
 
 		var items []WebsiteItem
 
-		rows = append(rows, text.NewRow(20, class.Quota, titleText))
+		rows = append(rows, text.NewRow(20, course.Quota, titleText))
 
-		for i, application := range class.Applications {
-			item := newWebsiteItem(i+1, application.Applicant.Name, application.CompositeScore, application.EnrollmentID)
+		for i, registration := range course.Registrations {
+			item := newWebsiteItem(i+1, registration.Candidate.Name, registration.CompositeScore, registration.EnrollmentID)
 			items = append(items, item)
 		}
 
@@ -92,8 +98,8 @@ func (w *WebsiteRenderer) header(selection *SelectionInfo, period string) []core
 		call.WriteString(fmt.Sprintf(" %d", selection.WaitlistNum))
 	}
 
-	call.WriteString(fmt.Sprintf(" - %s - ", selection.Year))
-	call.WriteString(fmt.Sprintf("%so. Semestre", selection.Semester))
+	call.WriteString(fmt.Sprintf(" - %d - ", selection.Year))
+	call.WriteString(fmt.Sprintf("%do. Semestre", selection.Semester))
 	period = fmt.Sprintf("TURNO: %s", period)
 
 	var headerText props.Text

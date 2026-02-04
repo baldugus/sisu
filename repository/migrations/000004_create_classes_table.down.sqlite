@@ -1,2 +1,0 @@
-DROP INDEX idx_period_quota;
-DROP TABLE classes; 
