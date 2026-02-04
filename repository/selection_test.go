@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"changeme/repository"
-	"changeme/types"
+	"github.com/baldugus/sisu/repository"
+	"github.com/baldugus/sisu/types"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"

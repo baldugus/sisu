@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"changeme/types"
+	"github.com/baldugus/sisu/types"
 )
 
 type ApplicationRepository struct {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 
-	"changeme/repository"
+	"github.com/baldugus/sisu/repository"
 
 	"github.com/alecthomas/kong"
 	"github.com/golang-migrate/migrate/v4"

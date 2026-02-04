@@ -3,7 +3,7 @@ package repository
 import (
 	"fmt"
 
-	"changeme/types"
+	"github.com/baldugus/sisu/types"
 )
 
 type ApplicantRepository struct {

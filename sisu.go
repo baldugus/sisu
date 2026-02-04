@@ -3,22 +3,17 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
-	"encoding/csv"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"sort"
-	"strconv"
-	"strings"
+	"time"
 
-	"changeme/repository"
-	"changeme/types"
+	"github.com/baldugus/sisu/csvparser"
+	"github.com/baldugus/sisu/pdfbuilder"
+	"github.com/baldugus/sisu/repository"
+	"github.com/baldugus/sisu/types"
 
-	"github.com/dimchansky/utfbom"
-	"github.com/gocarina/gocsv"
 	"go.uber.org/zap"
 )
 
@@ -38,7 +33,6 @@ var (
 	ErrMissingFirstImport            = errors.New("Arquivo de aprovados deve ser importado antes do arquivo de alunos que manifestaram interesse")
 	ErrMissingRollCall               = errors.New("Chamada não encontrada")
 	ErrNoApplications                = errors.New("Não há inscrições deste tipo")
-	ErrNoFile                        = errors.New("Arquivo selecionado não existe")
 	ErrNoRollCalls                   = errors.New("Não existem chamadas criadas")
 	ErrNoSelection                   = errors.New("Não há seleção deste tipo importada")
 	ErrOpenFile                      = errors.New("Erro desconhecido ao abrir arquivo, mais detalhes nos logs")
@@ -63,71 +57,40 @@ type SISU struct {
 
 // TODO: write test for this func
 // TODO: validate file name and if its the same semester
-// FIXME: why is it so big and complex?
 func (s *SISU) LoadSelection(path string, kind types.SelectionKind) error { //nolint: funlen, cyclop
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return ErrNoFile
-		}
+	s.l.Infow("loading selection", "path", path, "kind", kind)
 
-		if os.IsPermission(err) {
-			return ErrPermFile
-		}
-
-		s.l.Errorw("os open",
-			"error", err,
-		)
-
-		return ErrOpenFile
-	}
-
+	// TODO: types/selection.go L12-15
 	status := "WAITING"
 	if kind == types.ApprovedSelection {
 		status = "APPROVED"
 	}
 
-	rawApplications, err := parseCSVApplicants(file, status)
+	// Should it be current timestamp or user input?
+	// Maybe ask in a pop-up for the year and semester
+	date := time.Now().Format(time.DateTime)
+
+	parsedCsv, err := csvparser.ParseFile(path)
 	if err != nil {
-		if errors.Is(err, gocsv.ErrEmptyCSVFile) {
-			return ErrEmptyCSV
-		}
-
-		if errors.Is(err, gocsv.ErrUnmatchedStructTags) ||
-			errors.Is(err, gocsv.ErrDoubleHeaderNames) ||
-			errors.Is(err, gocsv.ErrNoStructTags) {
-			return ErrMalformedCSV
-		}
-
-		s.l.Errorw("parse csv applications",
-			"file", file,
-			"status", status,
-			"error", err,
-		)
-
-		return ErrParseFile
+		s.l.Errorw("failed to parse CSV file",
+			"path", path,
+			"kind", kind,
+			"error", err)
+		return fmt.Errorf("parse csv: %w", err)
 	}
 
-	applications := make([]*types.Application, len(rawApplications))
-
-	for i, csvApplicant := range rawApplications { //nolint: varnamelen
-		application, err := csvApplicant.ToApplication(status)
-		if err != nil {
-			return fmt.Errorf("csv applicant to application: %w", err)
-		}
-
-		applications[i] = application
+	applications, err := parsedCsv.ToApplications(status)
+	if err != nil {
+		s.l.Errorw("failed to convert parsed csv file",
+			"path", path,
+			"kind", kind,
+			"error", err)
+		return fmt.Errorf("convert csv to applications: %w", err)
 	}
 
-	var selection types.Selection
-	selection.Name = file.Name()
-	selection.Kind = kind
+	selection := parsedCsv.ToSelection(kind, date)
 
-	if len(rawApplications) > 0 {
-		selection.Date = rawApplications[0].Date
-		selection.Institution = rawApplications[0].Institution
-		selection.Course = rawApplications[0].Course
-	}
+	// UNTOUCHED AREA BELOW NEEDS REFACTORING AND PROPER LOGGING
 
 	if err := s.selectionRepo.Begin(); err != nil {
 		return fmt.Errorf("begin: %w", err)
@@ -465,10 +428,36 @@ func (s *SISU) FetchPeriodName(periodID int64) (string, error) {
 	return period.Name, nil
 }
 
-func (s *SISU) WebsitePDF(rollcallID int64, periodID int64, file string) error {
+func (s *SISU) CreatePDFBuilder(period string, builderClasses []*pdfbuilder.ClassInfo, waitlistNum int64, file string) (*pdfbuilder.Builder, error) {
 	selection, err := s.selectionRepo.FindSelectionByKind(types.ApprovedSelection)
 	if err != nil {
-		return fmt.Errorf("find selection by kind: %w", err)
+		return nil, fmt.Errorf("find selection by kind: %w", err)
+	}
+
+	date, err := selection.ParseDate()
+	if err != nil {
+		return nil, fmt.Errorf("parse date: %w", err)
+	}
+
+	year := fmt.Sprintf("%d", date.Year())
+	semester := "1"
+	if int(date.Month()) >= 6 {
+		semester = "2"
+	}
+
+	builderSelection := pdfbuilder.NewSelectionInfo(selection, year, semester, waitlistNum)
+
+	return &pdfbuilder.Builder{
+		Period:    period,
+		Classes:   builderClasses,
+		Selection: builderSelection,
+	}, nil
+}
+
+func (s *SISU) WebsitePDF(rollcallID int64, periodID int64, file string) error {
+	rollcall, err := s.rollcallRepo.FindRollcallByID(&rollcallID)
+	if err != nil {
+		return fmt.Errorf("find rollcall by id: %w", err)
 	}
 
 	classes, err := s.classRepo.FindClassesByPeriodID(periodID)
@@ -476,19 +465,37 @@ func (s *SISU) WebsitePDF(rollcallID int64, periodID int64, file string) error {
 		return fmt.Errorf("find class by period id: %w", err)
 	}
 
-	rollcall, err := s.rollcallRepo.FindRollcallByID(&rollcallID)
+	builderClasses := make([]*pdfbuilder.ClassInfo, len(classes))
+	for i, class := range classes {
+		filter := types.ApplicationsFilter{
+			RollcallID: rollcall.ID,
+			ClassID:    &class.ID,
+		}
+
+		applications, err := s.applicationRepo.FindApplications(filter)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				applications = []*types.Application{}
+			} else {
+				return fmt.Errorf("find applications: %w", err)
+			}
+		}
+
+		builderClasses[i] = pdfbuilder.NewClassInfo(class.Quota.Name, applications)
+	}
+
+	if len(classes) == 0 {
+		return fmt.Errorf("no classes found")
+	}
+
+	period := classes[0].Period.Name
+
+	builder, err := s.CreatePDFBuilder(period, builderClasses, rollcall.Number, file)
 	if err != nil {
-		return fmt.Errorf("find rollcall by id: %w", err)
+		return fmt.Errorf("create pdf builder: %w", err)
 	}
 
-	pdf := PDF{
-		selection:       selection,
-		classes:         classes,
-		rollcall:        rollcall,
-		applicationRepo: &s.applicationRepo,
-	}
-
-	if err := pdf.ToWebsite(file); err != nil {
+	if err := builder.BuildWebsitePdf(file); err != nil {
 		return fmt.Errorf("pdf to website: %w", err)
 	}
 
@@ -496,9 +503,9 @@ func (s *SISU) WebsitePDF(rollcallID int64, periodID int64, file string) error {
 }
 
 func (s *SISU) EnrollmentPDF(rollcallID int64, periodID int64, file string) error {
-	selection, err := s.selectionRepo.FindSelectionByKind(types.ApprovedSelection)
+	rollcall, err := s.rollcallRepo.FindRollcallByID(&rollcallID)
 	if err != nil {
-		return fmt.Errorf("find selection by kind: %w", err)
+		return fmt.Errorf("find rollcall by id: %w", err)
 	}
 
 	classes, err := s.classRepo.FindClassesByPeriodID(periodID)
@@ -506,29 +513,47 @@ func (s *SISU) EnrollmentPDF(rollcallID int64, periodID int64, file string) erro
 		return fmt.Errorf("find class by period id: %w", err)
 	}
 
-	rollcall, err := s.rollcallRepo.FindRollcallByID(&rollcallID)
+	builderClasses := make([]*pdfbuilder.ClassInfo, len(classes))
+	for i, class := range classes {
+		filter := types.ApplicationsFilter{
+			RollcallID: rollcall.ID,
+			ClassID:    &class.ID,
+		}
+
+		applications, err := s.applicationRepo.FindApplications(filter)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				applications = []*types.Application{}
+			} else {
+				return fmt.Errorf("find applications: %w", err)
+			}
+		}
+
+		builderClasses[i] = pdfbuilder.NewClassInfo(class.Quota.Name, applications)
+	}
+
+	if len(classes) == 0 {
+		return fmt.Errorf("no classes found")
+	}
+
+	period := classes[0].Period.Name
+
+	builder, err := s.CreatePDFBuilder(period, builderClasses, rollcall.Number, file)
 	if err != nil {
-		return fmt.Errorf("find rollcall by id: %w", err)
+		return fmt.Errorf("create pdf builder: %w", err)
 	}
 
-	pdf := PDF{
-		selection:       selection,
-		classes:         classes,
-		rollcall:        rollcall,
-		applicationRepo: &s.applicationRepo,
-	}
-
-	if err := pdf.ToEnrollment(file); err != nil {
-		return fmt.Errorf("pdf to website: %w", err)
+	if err := builder.BuildEnrollmentPdf(file); err != nil {
+		return fmt.Errorf("pdf to enrollment: %w", err)
 	}
 
 	return nil
 }
 
 func (s *SISU) EmailPDF(rollcallID int64, periodID int64, file string) error {
-	selection, err := s.selectionRepo.FindSelectionByKind(types.ApprovedSelection)
+	rollcall, err := s.rollcallRepo.FindRollcallByID(&rollcallID)
 	if err != nil {
-		return fmt.Errorf("find selection by kind: %w", err)
+		return fmt.Errorf("find rollcall by id: %w", err)
 	}
 
 	classes, err := s.classRepo.FindClassesByPeriodID(periodID)
@@ -536,45 +561,82 @@ func (s *SISU) EmailPDF(rollcallID int64, periodID int64, file string) error {
 		return fmt.Errorf("find class by period id: %w", err)
 	}
 
-	rollcall, err := s.rollcallRepo.FindRollcallByID(&rollcallID)
+	builderClasses := make([]*pdfbuilder.ClassInfo, len(classes))
+	for i, class := range classes {
+		filter := types.ApplicationsFilter{
+			RollcallID: rollcall.ID,
+			ClassID:    &class.ID,
+		}
+
+		applications, err := s.applicationRepo.FindApplications(filter)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				applications = []*types.Application{}
+			} else {
+				return fmt.Errorf("find applications: %w", err)
+			}
+		}
+
+		builderClasses[i] = pdfbuilder.NewClassInfo(class.Quota.Name, applications)
+	}
+
+	if len(classes) == 0 {
+		return fmt.Errorf("no classes found")
+	}
+
+	period := classes[0].Period.Name
+
+	builder, err := s.CreatePDFBuilder(period, builderClasses, rollcall.Number, file)
 	if err != nil {
-		return fmt.Errorf("find rollcall by id: %w", err)
+		return fmt.Errorf("create pdf builder: %w", err)
 	}
 
-	pdf := PDF{
-		selection:       selection,
-		classes:         classes,
-		rollcall:        rollcall,
-		applicationRepo: &s.applicationRepo,
-	}
-
-	if err := pdf.ToEmail(file); err != nil {
-		return fmt.Errorf("pdf to website: %w", err)
+	if err := builder.BuildEmailPdf(file); err != nil {
+		return fmt.Errorf("pdf to email: %w", err)
 	}
 
 	return nil
 }
 
 func (s *SISU) TeacherPDF(periodID int64, file string) error {
-	selection, err := s.selectionRepo.FindSelectionByKind(types.ApprovedSelection)
-	if err != nil {
-		return fmt.Errorf("find selection by kind: %w", err)
-	}
-
 	classes, err := s.classRepo.FindClassesByPeriodID(periodID)
 	if err != nil {
 		return fmt.Errorf("find class by period id: %w", err)
 	}
 
-	pdf := PDF{
-		selection:       selection,
-		classes:         classes,
-		rollcall:        nil,
-		applicationRepo: &s.applicationRepo,
+	var builderClasses []*pdfbuilder.ClassInfo
+	for _, class := range classes {
+		status := "ENROLLED"
+		filter := types.ApplicationsFilter{
+			ClassID: &class.ID,
+			Status:  &status,
+		}
+
+		applications, err := s.applicationRepo.FindApplications(filter)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			} else {
+				return fmt.Errorf("find applications: %w", err)
+			}
+		}
+
+		builderClasses = append(builderClasses, pdfbuilder.NewClassInfo(class.Quota.Name, applications))
 	}
 
-	if err := pdf.ToTeacher(file); err != nil {
-		return fmt.Errorf("pdf to website: %w", err)
+	if len(classes) == 0 {
+		return fmt.Errorf("no classes found")
+	}
+
+	period := classes[0].Period.Name
+
+	builder, err := s.CreatePDFBuilder(period, builderClasses, 0, file)
+	if err != nil {
+		return fmt.Errorf("create pdf builder: %w", err)
+	}
+
+	if err := builder.BuildTeacherPdf(file); err != nil {
+		return fmt.Errorf("pdf to teacher: %w", err)
 	}
 
 	return nil
@@ -647,201 +709,4 @@ func (s *SISU) Destroy() error {
 
 	s.service.Destroy()
 	return nil
-}
-
-type csvApplication struct {
-	Stage                string `csv:"NU_ETAPA"`
-	SchedulePeriod       string `csv:"DS_TURNO"`
-	Seats                string `csv:"QT_VAGAS_CONCORRENCIA"`
-	EnrollmentID         string `csv:"CO_INSCRICAO_ENEM"`
-	Name                 string `csv:"NO_INSCRITO"`
-	CPF                  string `csv:"NU_CPF_INSCRITO"`
-	Date                 string `csv:"DT_OPERACAO"`
-	SocialName           string `csv:"NO_SOCIAL"`
-	BirthDate            string `csv:"DT_NASCIMENTO"`
-	Sex                  string `csv:"TP_SEXO"`
-	MotherName           string `csv:"NO_MAE"`
-	AddressLine          string `csv:"DS_LOGRADOURO"`
-	HouseNumber          string `csv:"NU_ENDERECO"`
-	AddressLine2         string `csv:"DS_COMPLEMENTO"`
-	State                string `csv:"SG_UF_INSCRITO"`
-	Municipality         string `csv:"NO_MUNICIPIO"`
-	Neighborhood         string `csv:"NO_BAIRRO"`
-	CEP                  string `csv:"NU_CEP"`
-	Phone1               string `csv:"NU_FONE1"`
-	Phone2               string `csv:"NU_FONE2"`
-	Email                string `csv:"DS_EMAIL"`
-	LanguagesScore       string `csv:"NU_NOTA_L"`
-	HumanitiesScore      string `csv:"NU_NOTA_CH"`
-	NaturalSciencesScore string `csv:"NU_NOTA_CN"`
-	MathematicsScore     string `csv:"NU_NOTA_M"`
-	EssayScore           string `csv:"NU_NOTA_R"`
-	Option               string `csv:"ST_OPCAO"`
-	Quota                string `csv:"NO_MODALIDADE_CONCORRENCIA"`
-	CompositeScore       string `csv:"NU_NOTA_CANDIDATO"`
-	MinimumScore         string `csv:"NU_NOTACORTE_CONCORRIDA"`
-	Ranking              string `csv:"NU_CLASSIFICACAO"`
-	Institution          string `csv:"SG_IES"`
-	Course               string `csv:"NO_CURSO"`
-}
-
-// TODO: write test for this func.
-func parseCSVApplicants(
-	csvApplicationReader io.Reader,
-	status string,
-) ([]*csvApplication, error) {
-	preparedCSVReader, err := prepareCSV(csvApplicationReader)
-	if err != nil {
-		return nil, fmt.Errorf("prepare CSV: %w", err)
-	}
-
-	// We use LazyQuotes because some fields are surrounded by quotes while
-	// others don't. Same comment from prepareCSV() applies here, we have no clue
-	// if this is like this at source.
-	gocsv.SetCSVReader(func(in io.Reader) gocsv.CSVReader {
-		c := csv.NewReader(in)
-		c.Comma = ';'
-		c.LazyQuotes = true
-
-		return c
-	})
-
-	csvApplicants := []*csvApplication{}
-
-	if err := gocsv.Unmarshal(preparedCSVReader, &csvApplicants); err != nil {
-		return nil, fmt.Errorf("CSV unmarshal: %w", err)
-	}
-
-	return csvApplicants, nil
-}
-
-func (a *csvApplication) ToApplication(status string) (*types.Application, error) {
-	minimumScore, err := scoreStringToFloat(a.MinimumScore)
-	if err != nil {
-		return nil, fmt.Errorf("minimum score string to float: %w", err)
-	}
-
-	seats, err := strconv.Atoi(a.Seats)
-	if err != nil {
-		return nil, fmt.Errorf("seats string to int: %w", err)
-	}
-
-	option, err := strconv.Atoi(a.Option)
-	if err != nil {
-		return nil, fmt.Errorf("option string to int: %w", err)
-	}
-
-	languagesScore, err := scoreStringToFloat(a.LanguagesScore)
-	if err != nil {
-		return nil, fmt.Errorf("languages score string to float: %w", err)
-	}
-
-	humanitiesScore, err := scoreStringToFloat(a.HumanitiesScore)
-	if err != nil {
-		return nil, fmt.Errorf("humanities score string to float: %w", err)
-	}
-
-	naturalSciencesScore, err := scoreStringToFloat(a.NaturalSciencesScore)
-	if err != nil {
-		return nil, fmt.Errorf("natural sciences score string to float: %w", err)
-	}
-
-	mathematicsScore, err := scoreStringToFloat(a.MathematicsScore)
-	if err != nil {
-		return nil, fmt.Errorf("mathematics score string to float: %w", err)
-	}
-
-	essayScore, err := scoreStringToFloat(a.EssayScore)
-	if err != nil {
-		return nil, fmt.Errorf("essay score string to float: %w", err)
-	}
-
-	compositeScore, err := scoreStringToFloat(a.CompositeScore)
-	if err != nil {
-		return nil, fmt.Errorf("composite score string to float: %w", err)
-	}
-
-	ranking, err := strconv.Atoi(a.Ranking)
-	if err != nil {
-		return nil, fmt.Errorf("ranking string to int: %w", err)
-	}
-
-	return &types.Application{
-		ID:                   0,
-		Status:               status,
-		EnrollmentID:         a.EnrollmentID,
-		Option:               option,
-		LanguagesScore:       languagesScore,
-		HumanitiesScore:      humanitiesScore,
-		NaturalSciencesScore: naturalSciencesScore,
-		MathematicsScore:     mathematicsScore,
-		EssayScore:           essayScore,
-		CompositeScore:       compositeScore,
-		Ranking:              ranking,
-		Applicant: types.Applicant{
-			CPF:          a.CPF,
-			Name:         a.Name,
-			SocialName:   a.SocialName,
-			BirthDate:    a.BirthDate,
-			Sex:          a.Sex,
-			MotherName:   a.MotherName,
-			AddressLine:  a.AddressLine,
-			AddressLine2: a.AddressLine2,
-			HouseNumber:  a.HouseNumber,
-			Neighborhood: a.Neighborhood,
-			Municipality: a.Municipality,
-			State:        a.State,
-			CEP:          a.CEP,
-			Email:        a.Email,
-			Phone1:       a.Phone1,
-			Phone2:       a.Phone2,
-		},
-		Class: types.Class{
-			ID: 0,
-			Period: types.Period{
-				Name: a.SchedulePeriod,
-			},
-			Quota: types.Quota{
-				Name: a.Quota,
-			},
-			Seats:        seats,
-			MinimumScore: minimumScore,
-		},
-	}, nil
-}
-
-func scoreStringToFloat(s string) (float64, error) {
-	score, err := strconv.ParseFloat(strings.ReplaceAll(s, ",", "."), 64)
-	if err != nil {
-		return 0, fmt.Errorf("parse float: %w", err)
-	}
-
-	return score, nil
-}
-
-/*
-SISU's CSV file has peculiarities that require handling before parsing:
-
-  - First character in some cases is a UTF-8 BOM, hence the SkipOnly call;
-
-  - Line breaks are encoded using CR instead of LF (go expects LF);
-
-  - The first line is separated by commas instead of semicolons (as the rest
-    of the file is).
-
-Note that we're not sure if the file comes like this or if all of this is made
-by someones excel before the CSV gets here, but we have no direct access to
-the source file, so we have to deal with it.
-*/
-func prepareCSV(reader io.Reader) (io.Reader, error) {
-	rawCSV, err := io.ReadAll(utfbom.SkipOnly(reader))
-	if err != nil {
-		return nil, fmt.Errorf("read all: %w", err)
-	}
-
-	lines := strings.Split(string(rawCSV), "\r")
-	lines[0] = strings.ReplaceAll(lines[0], ",", ";")
-	preparedReader := bytes.NewReader([]byte(strings.Join(lines, "\n")))
-
-	return preparedReader, nil
 }
