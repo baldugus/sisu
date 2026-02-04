@@ -1,6 +1,7 @@
-build/bin
-node_modules
-frontend/dist
+/build/bin
+tmp
+/node_modules
+/frontend/dist
 *.sqlite
 .golangci.yml
 mise.toml
