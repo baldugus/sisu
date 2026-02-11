@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.5
 
 require (
-	github.com/alecthomas/kong v0.8.0
+	github.com/alecthomas/kong v1.14.0
 	github.com/dimchansky/utfbom v1.1.1
 	github.com/gen2brain/go-fitz v1.24.15
 	github.com/go-jet/jet/v2 v2.14.1
