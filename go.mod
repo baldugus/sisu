@@ -14,13 +14,14 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/johnfercher/maroto/v2 v2.0.0-beta.3
 	github.com/stretchr/testify v1.11.1
-	github.com/wailsapp/wails/v2 v2.11.0
+	github.com/wailsapp/wails/v2 v2.12.0
 	go.uber.org/zap v1.25.0
 	modernc.org/sqlite v1.25.0
 )
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
