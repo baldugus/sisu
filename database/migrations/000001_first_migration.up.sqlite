@@ -1,19 +1,28 @@
+-- Semesters table
+CREATE TABLE semesters (
+  id      INTEGER NOT NULL PRIMARY KEY,
+  year    INTEGER NOT NULL,
+  number  INTEGER NOT NULL CHECK (number IN (1, 2)),
+  status  TEXT NOT NULL CHECK (status IN ('open', 'closed')),
+  UNIQUE(year, number)
+);
+
 -- Selections
 CREATE TABLE selections (
   id          INTEGER NOT NULL PRIMARY KEY,
   kind        TEXT UNIQUE NOT NULL CHECK ( kind IN ('approved', 'waitlist') ),
   name        TEXT NOT NULL,
   year        INTEGER NOT NULL,
-  semester    INTEGER NOT NULL CHECK (semester IN (1, 2)),
   institution TEXT NOT NULL,
   degree      TEXT NOT NULL
 );
 
 -- Calls
 CREATE TABLE calls (
-  id     INTEGER NOT NULL PRIMARY KEY,
-  number INTEGER UNIQUE NOT NULL,
-  status TEXT NOT NULL CHECK ( status IN ('calling', 'done') )
+  id          INTEGER NOT NULL PRIMARY KEY,
+  number      INTEGER UNIQUE NOT NULL,
+  status      TEXT NOT NULL CHECK ( status IN ('calling', 'done') ),
+  semester_id INTEGER NOT NULL REFERENCES semesters(id) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 CREATE UNIQUE INDEX idx_one_active_call ON calls(status) WHERE status = 'calling';
@@ -69,8 +78,9 @@ CREATE TABLE registrations (
   essay_score            INTEGER NOT NULL,
   composite_score        INTEGER NOT NULL,
   ranking                INTEGER NOT NULL,
-  status                 TEXT NOT NULL CHECK (status IN ('approved', 'waitlisted', 'absent', 'enrolled')),
+  status                 TEXT NOT NULL CHECK (status IN ('approved', 'waitlisted', 'absent', 'enrolled', 'declined_promotion')),
   selection_id           INTEGER NOT NULL REFERENCES selections ON DELETE RESTRICT ON UPDATE RESTRICT,
   call_id                INTEGER DEFAULT NULL REFERENCES calls ON DELETE SET NULL ON UPDATE RESTRICT,
-  candidate_id           INTEGER NOT NULL REFERENCES candidates ON DELETE CASCADE ON UPDATE RESTRICT
+  candidate_id           INTEGER NOT NULL REFERENCES candidates ON DELETE CASCADE ON UPDATE RESTRICT,
+  semester_id            INTEGER DEFAULT NULL REFERENCES semesters(id) ON DELETE SET NULL ON UPDATE RESTRICT
 );

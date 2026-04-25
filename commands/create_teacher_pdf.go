@@ -33,7 +33,11 @@ func (cmd *CreateTeacherPDFCommand) Execute(db *database.Database) error {
 		courseInfos = append(courseInfos, pdfbuilder.NewCourseInfo(course.Quota, registrations))
 	}
 
-	selectionInfo := pdfbuilder.NewSelectionInfo(selection, 0)
+	var semesterNumber int32 = 1
+	// The teacher list doesn't depend on a single call, so we default to 1
+	// Ideally this could be passed as a parameter or fetched from the first registration
+
+	selectionInfo := pdfbuilder.NewSelectionInfo(selection, semesterNumber, 0)
 
 	builder := &pdfbuilder.Builder{
 		Period:    coursePeriodToPortuguese(cmd.Period),

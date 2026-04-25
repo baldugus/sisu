@@ -101,7 +101,6 @@ func run() int { //nolint: funlen
 
 		cmd := commands.LoadSelectionCommand{
 			Year:     2025,
-			Semester: 1,
 			Path:     CLI.File,
 			Content:  contents,
 			Kind:     types.SelectionKindApproved,

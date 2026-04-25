@@ -17,9 +17,10 @@ type callsTable struct {
 	sqlite.Table
 
 	// Columns
-	ID     sqlite.ColumnInteger
-	Number sqlite.ColumnInteger
-	Status sqlite.ColumnString
+	ID         sqlite.ColumnInteger
+	Number     sqlite.ColumnInteger
+	Status     sqlite.ColumnString
+	SemesterID sqlite.ColumnInteger
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -61,21 +62,23 @@ func newCallsTable(schemaName, tableName, alias string) *CallsTable {
 
 func newCallsTableImpl(schemaName, tableName, alias string) callsTable {
 	var (
-		IDColumn       = sqlite.IntegerColumn("id")
-		NumberColumn   = sqlite.IntegerColumn("number")
-		StatusColumn   = sqlite.StringColumn("status")
-		allColumns     = sqlite.ColumnList{IDColumn, NumberColumn, StatusColumn}
-		mutableColumns = sqlite.ColumnList{NumberColumn, StatusColumn}
-		defaultColumns = sqlite.ColumnList{}
+		IDColumn         = sqlite.IntegerColumn("id")
+		NumberColumn     = sqlite.IntegerColumn("number")
+		StatusColumn     = sqlite.StringColumn("status")
+		SemesterIDColumn = sqlite.IntegerColumn("semester_id")
+		allColumns       = sqlite.ColumnList{IDColumn, NumberColumn, StatusColumn, SemesterIDColumn}
+		mutableColumns   = sqlite.ColumnList{NumberColumn, StatusColumn, SemesterIDColumn}
+		defaultColumns   = sqlite.ColumnList{}
 	)
 
 	return callsTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:     IDColumn,
-		Number: NumberColumn,
-		Status: StatusColumn,
+		ID:         IDColumn,
+		Number:     NumberColumn,
+		Status:     StatusColumn,
+		SemesterID: SemesterIDColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

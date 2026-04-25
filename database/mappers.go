@@ -17,7 +17,6 @@ func (s *selectionResult) toSelectionDomain() *types.Selection {
 		Kind:        kind,
 		Name:        s.Name,
 		Year:        s.Year,
-		Semester:    s.Semester,
 		Institution: s.Institution,
 		Degree:      s.Degree,
 	}
@@ -131,9 +130,10 @@ func toCallDomain(c *model.Calls) *types.Call {
 	status, _ := types.ParseCallStatus(c.Status)
 
 	return &types.Call{
-		ID:     c.ID,
-		Status: status,
-		Number: c.Number,
+		ID:         c.ID,
+		Status:     status,
+		Number:     c.Number,
+		SemesterID: c.SemesterID,
 	}
 }
 
@@ -172,8 +172,9 @@ func toCandidateModel(candidate *types.Candidate) *model.Candidates {
 
 func toCallModel(call *types.Call) *model.Calls {
 	return &model.Calls{
-		Status: call.Status.String(),
-		Number: call.Number,
+		Status:     call.Status.String(),
+		Number:     call.Number,
+		SemesterID: call.SemesterID,
 	}
 }
 
@@ -183,7 +184,6 @@ func toSelectionModel(selection *types.Selection) *model.Selections {
 		Kind:        selection.Kind.String(),
 		Name:        selection.Name,
 		Year:        selection.Year,
-		Semester:    selection.Semester,
 		Institution: selection.Institution,
 		Degree:      selection.Degree,
 	}

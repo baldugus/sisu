@@ -25,7 +25,6 @@ type Selection struct {
 	Name        string
 	Kind        SelectionKind
 	Year        int32
-	Semester    int32
 	Institution string
 	Degree      string
 }

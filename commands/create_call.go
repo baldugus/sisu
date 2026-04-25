@@ -6,7 +6,9 @@ import (
 	"github.com/go-jet/jet/v2/qrm"
 )
 
-type CreateCallCommand struct{}
+type CreateCallCommand struct {
+	SemesterID int32
+}
 
 func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 	hasOpenCall, err := db.HasOpenCall()
@@ -29,8 +31,9 @@ func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 
 	return db.RunInTx(func(tx qrm.DB) error {
 		call := &types.Call{
-			Number: lastCallNumber + 1,
-			Status: types.CallStatusCalling,
+			Number:     lastCallNumber + 1,
+			Status:     types.CallStatusCalling,
+			SemesterID: cmd.SemesterID,
 		}
 
 		callID, err := database.CreateCall(tx, call)
@@ -40,6 +43,19 @@ func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 
 		totalPromoted := 0
 		totalAvailableSeats := int32(0)
+
+		semester, err := database.FetchSemesterByID(tx, cmd.SemesterID)
+		if err != nil {
+			return err
+		}
+
+		var sem2ID *int32
+		if semester.Number == 1 {
+			sem2, err := database.FetchSemesterByYearAndNumber(tx, semester.Year, 2)
+			if err == nil {
+				sem2ID = &sem2.ID
+			}
+		}
 
 		for _, course := range courses {
 			occupiedSeats, err := database.CountCourseOccupiedSeats(tx, course.ID)
@@ -54,10 +70,24 @@ func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 
 			totalAvailableSeats += availableSeats
 
-			registrationIDs, err := database.FetchWaitlistedRegistrationsByCourse(tx, course.ID, availableSeats)
-			if err != nil {
-				return err
+			var promotedIDs []int32
+			if sem2ID != nil {
+				promotedIDs, err = database.FetchPriorityRegistrationsByCourse(tx, course.ID, *sem2ID, availableSeats)
+				if err != nil {
+					return err
+				}
 			}
+
+			remainingSeats := availableSeats - int32(len(promotedIDs))
+			var waitlistedIDs []int32
+			if remainingSeats > 0 {
+				waitlistedIDs, err = database.FetchWaitlistedRegistrationsByCourse(tx, course.ID, remainingSeats)
+				if err != nil {
+					return err
+				}
+			}
+
+			registrationIDs := append(promotedIDs, waitlistedIDs...)
 
 			for _, regID := range registrationIDs {
 				if err := database.AssignRegistrationToCall(tx, regID, callID); err != nil {

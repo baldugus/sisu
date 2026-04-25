@@ -14,6 +14,7 @@ type CreateRegistrationArgs struct {
 	CourseID     int32
 	SelectionID  int32
 	CallID       *int32
+	SemesterID   *int32
 }
 
 func CreateRegistration(db qrm.DB, args *CreateRegistrationArgs) error {
@@ -22,6 +23,7 @@ func CreateRegistration(db qrm.DB, args *CreateRegistrationArgs) error {
 	registrationModel.CourseID = args.CourseID
 	registrationModel.SelectionID = args.SelectionID
 	registrationModel.CallID = args.CallID
+	registrationModel.SemesterID = args.SemesterID
 
 	stmt := Registrations.INSERT(Registrations.MutableColumns).
 		MODEL(registrationModel).
@@ -314,6 +316,29 @@ func FetchWaitlistedRegistrationsByCourse(db qrm.DB, courseID int32, limit int32
 			AND(Registrations.Status.EQ(String(types.RegistrationStatusWaitlisted.String()))),
 	).ORDER_BY(
 		Registrations.Ranking.DESC(),
+	).LIMIT(int64(limit))
+
+	var result []int32
+
+	err := stmt.Query(db, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func FetchPriorityRegistrationsByCourse(db qrm.DB, courseID int32, semesterID int32, limit int32) ([]int32, error) {
+	stmt := SELECT(
+		Registrations.ID,
+	).FROM(
+		Registrations,
+	).WHERE(
+		Registrations.CourseID.EQ(Int32(courseID)).
+			AND(Registrations.Status.EQ(String(types.RegistrationStatusApproved.String()))).
+			AND(Registrations.SemesterID.EQ(Int32(semesterID))),
+	).ORDER_BY(
+		Registrations.Ranking.ASC(),
 	).LIMIT(int64(limit))
 
 	var result []int32

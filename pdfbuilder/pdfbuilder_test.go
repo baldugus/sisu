@@ -17,7 +17,6 @@ func createMockSelection() *types.Selection {
 		Name:        "Seleção de Teste",
 		Kind:        types.SelectionKindApproved,
 		Year:        2025,
-		Semester:    1,
 		Institution: "FAETERJ-Rio",
 		Degree:      "Análise e Desenvolvimento de Sistemas",
 	}
@@ -63,7 +62,7 @@ func createMockCourseInfo() []*CourseInfo {
 
 func createMockSelectionInfo() *SelectionInfo {
 	sel := createMockSelection()
-	return NewSelectionInfo(sel, 0)
+	return NewSelectionInfo(sel, 1, 0)
 }
 
 func createMockBuilder() *Builder {
@@ -166,14 +165,13 @@ func TestBuildWebsitePdf_Waitlist_Golden(t *testing.T) {
 		Name:        "Seleção de Teste - Lista de Espera",
 		Kind:        types.SelectionKindWaitlist,
 		Year:        2025,
-		Semester:    1,
 		Institution: "FAETERJ-Rio",
 		Degree:      "Análise e Desenvolvimento de Sistemas",
 	}
 
 	builder := &Builder{
 		Period:    "Manhã",
-		Selection: NewSelectionInfo(sel, 1),
+		Selection: NewSelectionInfo(sel, 1, 1),
 		Courses:   createMockCourseInfo(),
 	}
 

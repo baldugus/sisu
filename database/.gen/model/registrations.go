@@ -23,4 +23,5 @@ type Registrations struct {
 	SelectionID          int32
 	CallID               *int32
 	CandidateID          int32
+	SemesterID           *int32
 }

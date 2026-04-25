@@ -2,7 +2,7 @@ package types
 
 import "encoding/json"
 
-// ENUM(approved, waitlisted, absent, enrolled)
+// ENUM(approved, waitlisted, absent, enrolled, declined_promotion)
 type RegistrationStatus int
 
 func (rs RegistrationStatus) MarshalJSON() ([]byte, error) {
@@ -22,6 +22,7 @@ type Registration struct {
 	Ranking              int32              `csv:"CLASSIFICACAO"`
 	Status               RegistrationStatus `csv:"SITUACAO"`
 	Candidate            *Candidate
+	SemesterID           *int32
 }
 
 type Registrations []*Registration

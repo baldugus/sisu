@@ -23,12 +23,12 @@ type SelectionInfo struct {
 	WaitlistNum int64
 }
 
-func NewSelectionInfo(selection *types.Selection, waitlistNum int64) *SelectionInfo {
+func NewSelectionInfo(selection *types.Selection, semester int32, waitlistNum int64) *SelectionInfo {
 	return &SelectionInfo{
 		Institution: selection.Institution,
 		Kind:        mapSelectionKind(selection.Kind),
 		Year:        selection.Year,
-		Semester:    selection.Semester,
+		Semester:    semester,
 		Course:      selection.Degree,
 		WaitlistNum: waitlistNum,
 	}

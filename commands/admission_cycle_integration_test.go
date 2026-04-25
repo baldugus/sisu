@@ -24,7 +24,6 @@ func TestCompleteAdmissionCycle(t *testing.T) {
 	// Verify approved selection created
 	approvedSelection := testutil.AssertSelectionExists(t, db.Database, types.SelectionKindApproved)
 	assert.Equal(t, int32(2025), approvedSelection.Year)
-	assert.Equal(t, int32(1), approvedSelection.Semester)
 
 	// Verify call #1 created automatically
 	call1 := testutil.AssertCallCreated(t, db.Database, 1)

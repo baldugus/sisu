@@ -122,10 +122,14 @@ func TestDeleteSelectionCommand_CannotDeleteWithMultipleCalls(t *testing.T) {
 	require.NoError(t, err)
 	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
+	semester, err := database.FetchSemesterByYearAndNumber(db.Database.DB(), 2025, 1)
+	require.NoError(t, err)
+
 	err = db.RunInTx(func(tx qrm.DB) error {
 		_, err := database.CreateCall(tx, &types.Call{
-			Number: 2,
-			Status: types.CallStatusCalling,
+			Number:     2,
+			Status:     types.CallStatusCalling,
+			SemesterID: semester.ID,
 		})
 		return err
 	})

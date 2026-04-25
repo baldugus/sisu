@@ -18,7 +18,6 @@ func TestLoadApprovedSelection_Success(t *testing.T) {
 
 	cmd := commands.LoadSelectionCommand{
 		Year:     2025,
-		Semester: 1,
 		FilePath: "testdata/approved_small.csv",
 		Kind:     types.SelectionKindApproved,
 	}
@@ -36,7 +35,6 @@ func TestLoadApprovedSelection_Success(t *testing.T) {
 
 	selection := testutil.AssertSelectionExists(t, db.Database, types.SelectionKindApproved)
 	assert.Equal(t, int32(2025), selection.Year)
-	assert.Equal(t, int32(1), selection.Semester)
 
 	// Verify first call created with "calling" status
 	call, err := db.FetchCallByNumber(1)
@@ -71,7 +69,6 @@ func TestLoadWaitlistSelection_Success(t *testing.T) {
 
 	cmd := commands.LoadSelectionCommand{
 		Year:     2025,
-		Semester: 1,
 		FilePath: "testdata/waitlist_small.csv",
 		Kind:     types.SelectionKindWaitlist,
 	}
@@ -116,7 +113,6 @@ func TestLoadSelection_BusinessRules(t *testing.T) {
 			},
 			cmd: commands.LoadSelectionCommand{
 				Year:     2025,
-				Semester: 1,
 				FilePath: "testdata/approved_small.csv",
 				Kind:     types.SelectionKindApproved,
 			},
@@ -129,7 +125,6 @@ func TestLoadSelection_BusinessRules(t *testing.T) {
 			},
 			cmd: commands.LoadSelectionCommand{
 				Year:     2025,
-				Semester: 1,
 				FilePath: "testdata/waitlist_small.csv",
 				Kind:     types.SelectionKindWaitlist,
 			},
@@ -156,7 +151,6 @@ func TestLoadSelection_TransactionRollback(t *testing.T) {
 
 	cmd := commands.LoadSelectionCommand{
 		Year:     2025,
-		Semester: 1,
 		FilePath: "testdata/invalid_missing_fields.csv",
 		Kind:     types.SelectionKindApproved,
 	}
@@ -190,7 +184,7 @@ func TestLoadSelection_CreatesCourses(t *testing.T) {
 	assert.Equal(t, int32(10), morningCourse.Seats)
 
 	eveningCourse := findCourseByPeriod(t, courses, types.CoursePeriodEvening)
-	assert.Equal(t, int32(15), eveningCourse.Seats)
+	assert.Equal(t, int32(16), eveningCourse.Seats)
 }
 
 func TestLoadSelection_CreatesCandidates(t *testing.T) {

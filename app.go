@@ -46,6 +46,8 @@ func AppErrorToResponse(err error) Response {
 		return Response{500, "Arquivo CSV vazio.", ""}
 	case errors.As(err, &csvparser.ErrFileParse{}):
 		return Response{500, "Erro ao analisar o arquivo CSV. Contate o desenvolvedor.", ""}
+	case errors.As(err, &csvparser.ErrOddSeatsCount{}):
+		return Response{500, "O número total de vagas deve ser par para divisão entre semestres.", ""}
 	case errors.As(err, &csvparser.ErrLineMapping{}):
 		return Response{500, "Erro de validação em um campo do arquivo CSV. Contate o desenvolvedor.", ""}
 	case errors.As(err, &commands.ErrSelectionNotFound{}):
@@ -126,10 +128,9 @@ func (a *App) SaveFileDialog(title string, defaultFilename string, filterPattern
 	})
 }
 
-func (a *App) LoadApprovedSelection(year int32, semester int32, filePath string) Response {
+func (a *App) LoadApprovedSelection(year int32, filePath string) Response {
 	cmd := commands.LoadSelectionCommand{
 		Year:     year,
-		Semester: semester,
 		FilePath: filePath,
 		Kind:     types.SelectionKindApproved,
 	}
@@ -141,10 +142,9 @@ func (a *App) LoadApprovedSelection(year int32, semester int32, filePath string)
 	return Response{200, "OK", ""}
 }
 
-func (a *App) LoadWaitlistSelection(year int32, semester int32, filePath string) Response {
+func (a *App) LoadWaitlistSelection(year int32, filePath string) Response {
 	cmd := commands.LoadSelectionCommand{
 		Year:     year,
-		Semester: semester,
 		FilePath: filePath,
 		Kind:     types.SelectionKindWaitlist,
 	}
@@ -156,8 +156,8 @@ func (a *App) LoadWaitlistSelection(year int32, semester int32, filePath string)
 	return Response{200, "OK", ""}
 }
 
-func (a *App) LoadInterestedSelection(year int32, semester int32, filePath string) Response {
-	return a.LoadWaitlistSelection(year, semester, filePath)
+func (a *App) LoadInterestedSelection(year int32, filePath string) Response {
+	return a.LoadWaitlistSelection(year, filePath)
 }
 
 func (a *App) FetchApprovedSelection() Response {
@@ -357,8 +357,8 @@ func (a *App) FetchApplicationsByRollCall(callID int32) Response {
 	return a.FetchRegistrationsByCallID(callID)
 }
 
-func (a *App) CreateRollCall() Response {
-	cmd := commands.CreateCallCommand{}
+func (a *App) CreateRollCall(semesterID int32) Response {
+	cmd := commands.CreateCallCommand{SemesterID: semesterID}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {
 		return AppErrorToResponse(err)

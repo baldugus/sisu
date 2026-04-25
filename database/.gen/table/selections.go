@@ -21,7 +21,6 @@ type selectionsTable struct {
 	Kind        sqlite.ColumnString
 	Name        sqlite.ColumnString
 	Year        sqlite.ColumnInteger
-	Semester    sqlite.ColumnInteger
 	Institution sqlite.ColumnString
 	Degree      sqlite.ColumnString
 
@@ -69,11 +68,10 @@ func newSelectionsTableImpl(schemaName, tableName, alias string) selectionsTable
 		KindColumn        = sqlite.StringColumn("kind")
 		NameColumn        = sqlite.StringColumn("name")
 		YearColumn        = sqlite.IntegerColumn("year")
-		SemesterColumn    = sqlite.IntegerColumn("semester")
 		InstitutionColumn = sqlite.StringColumn("institution")
 		DegreeColumn      = sqlite.StringColumn("degree")
-		allColumns        = sqlite.ColumnList{IDColumn, KindColumn, NameColumn, YearColumn, SemesterColumn, InstitutionColumn, DegreeColumn}
-		mutableColumns    = sqlite.ColumnList{KindColumn, NameColumn, YearColumn, SemesterColumn, InstitutionColumn, DegreeColumn}
+		allColumns        = sqlite.ColumnList{IDColumn, KindColumn, NameColumn, YearColumn, InstitutionColumn, DegreeColumn}
+		mutableColumns    = sqlite.ColumnList{KindColumn, NameColumn, YearColumn, InstitutionColumn, DegreeColumn}
 		defaultColumns    = sqlite.ColumnList{}
 	)
 
@@ -85,7 +83,6 @@ func newSelectionsTableImpl(schemaName, tableName, alias string) selectionsTable
 		Kind:        KindColumn,
 		Name:        NameColumn,
 		Year:        YearColumn,
-		Semester:    SemesterColumn,
 		Institution: InstitutionColumn,
 		Degree:      DegreeColumn,
 

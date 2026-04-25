@@ -45,8 +45,8 @@ func (cmd *UpdateRegistrationStatusCommand) validateTransition(
 	case types.RegistrationStatusApproved:
 		return cmd.validateToApproved(currentStatus, call)
 
-	case types.RegistrationStatusEnrolled, types.RegistrationStatusAbsent:
-		return cmd.validateToEnrolledOrAbsent(currentStatus, call)
+	case types.RegistrationStatusEnrolled, types.RegistrationStatusAbsent, types.RegistrationStatusDeclinedPromotion:
+		return cmd.validateToEnrolledOrAbsentOrDeclined(currentStatus, call)
 
 	default:
 		return ErrInvalidStatusTransition{}
@@ -57,14 +57,14 @@ func (cmd *UpdateRegistrationStatusCommand) validateToApproved(
 	currentStatus types.RegistrationStatus,
 	call *types.Call,
 ) error {
-	if currentStatus != types.RegistrationStatusEnrolled && currentStatus != types.RegistrationStatusAbsent {
+	if currentStatus != types.RegistrationStatusEnrolled && currentStatus != types.RegistrationStatusAbsent && currentStatus != types.RegistrationStatusDeclinedPromotion {
 		return ErrInvalidStatusTransition{}
 	}
 
 	return requireOpenCall(call)
 }
 
-func (cmd *UpdateRegistrationStatusCommand) validateToEnrolledOrAbsent(
+func (cmd *UpdateRegistrationStatusCommand) validateToEnrolledOrAbsentOrDeclined(
 	currentStatus types.RegistrationStatus,
 	call *types.Call,
 ) error {

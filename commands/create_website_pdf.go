@@ -50,7 +50,12 @@ func (cmd *CreateWebsitePDFCommand) Execute(db *database.Database) error {
 		waitlistNum = int64(call.Number - 1)
 	}
 
-	selectionInfo := pdfbuilder.NewSelectionInfo(selection, waitlistNum)
+	semester, err := database.FetchSemesterByID(db.DB(), call.SemesterID)
+	if err != nil {
+		return fmt.Errorf("fetch semester: %w", err)
+	}
+
+	selectionInfo := pdfbuilder.NewSelectionInfo(selection, semester.Number, waitlistNum)
 
 	builder := &pdfbuilder.Builder{
 		Period:    coursePeriodToPortuguese(cmd.Period),

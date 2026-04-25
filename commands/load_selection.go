@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -12,7 +14,6 @@ import (
 
 type LoadSelectionCommand struct {
 	Year     int32
-	Semester int32
 	FilePath string
 	Kind     types.SelectionKind
 }
@@ -36,12 +37,43 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 		return fmt.Errorf("parse csv: %w", err)
 	}
 
-	parsed, err := parsedCsv.ToSelectionDomain(cmd.Kind, cmd.Year, cmd.Semester)
+	parsed, err := parsedCsv.ToSelectionDomain(cmd.Kind, cmd.Year)
 	if err != nil {
 		return fmt.Errorf("parsing selection: %w", err)
 	}
 
 	err = db.RunInTx(func(tx qrm.DB) error {
+		var sem1ID, sem2ID int32
+		if cmd.Kind == types.SelectionKindApproved {
+			sem1, err := database.FetchSemesterByYearAndNumber(tx, cmd.Year, 1)
+			if err != nil {
+				if errors.Is(err, qrm.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+					sem1ID, err = database.CreateSemester(tx, cmd.Year, 1)
+					if err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
+			} else {
+				sem1ID = sem1.ID
+			}
+
+			sem2, err := database.FetchSemesterByYearAndNumber(tx, cmd.Year, 2)
+			if err != nil {
+				if errors.Is(err, qrm.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+					sem2ID, err = database.CreateSemester(tx, cmd.Year, 2)
+					if err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
+			} else {
+				sem2ID = sem2.ID
+			}
+		}
+
 		selectionID, err := database.CreateSelection(tx, parsed.Selection)
 		if err != nil {
 			return err
@@ -50,8 +82,9 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 		var callID *int32
 		if cmd.Kind == types.SelectionKindApproved {
 			id, err := database.CreateCall(tx, &types.Call{
-				Number: 1,
-				Status: types.CallStatusCalling,
+				Number:     1,
+				Status:     types.CallStatusCalling,
+				SemesterID: sem1ID,
 			})
 			if err != nil {
 				return err
@@ -75,12 +108,22 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 				return err
 			}
 
+			var mappedSemesterID *int32
+			if parsedReg.Registration.SemesterID != nil {
+				if *parsedReg.Registration.SemesterID == 1 {
+					mappedSemesterID = &sem1ID
+				} else if *parsedReg.Registration.SemesterID == 2 {
+					mappedSemesterID = &sem2ID
+				}
+			}
+
 			err = database.CreateRegistration(tx, &database.CreateRegistrationArgs{
 				Registration: parsedReg.Registration,
 				CandidateID:  candidateID,
 				CourseID:     courseID,
 				SelectionID:  selectionID,
 				CallID:       callID,
+				SemesterID:   mappedSemesterID,
 			})
 			if err != nil {
 				return err

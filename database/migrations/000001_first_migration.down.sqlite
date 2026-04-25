@@ -6,3 +6,4 @@ DROP TABLE quotas;
 DROP INDEX idx_one_active_call;
 DROP TABLE calls;
 DROP TABLE selections;
+DROP TABLE semesters;

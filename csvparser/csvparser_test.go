@@ -328,16 +328,14 @@ func TestToSelection(t *testing.T) {
 					CompositeScore:       "500,0",
 				},
 			},
-			filename:     "test.csv",
-			kind:         types.SelectionKindApproved,
-			year:         2024,
-			semester:     1,
-			wantName:     "test.csv",
-			wantYear:     2024,
-			wantSemester: 1,
-			wantInst:     "FAETERJ-Rio",
-			wantCourse:   "Computer Science",
-			wantErr:      false,
+			filename:   "test.csv",
+			kind:       types.SelectionKindApproved,
+			year:       2024,
+			wantName:   "test.csv",
+			wantYear:   2024,
+			wantInst:   "FAETERJ-Rio",
+			wantCourse: "Computer Science",
+			wantErr:    false,
 		},
 		{
 			name:       "empty candidates",
@@ -345,7 +343,6 @@ func TestToSelection(t *testing.T) {
 			filename:   "empty.csv",
 			kind:       types.SelectionKindApproved,
 			year:       2024,
-			semester:   1,
 			wantErr:    true,
 		},
 	}
@@ -357,7 +354,7 @@ func TestToSelection(t *testing.T) {
 				name:       tt.filename,
 			}
 
-			got, err := pc.ToSelectionDomain(tt.kind, tt.year, tt.semester)
+			got, err := pc.ToSelectionDomain(tt.kind, tt.year)
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error but got none")
@@ -376,9 +373,6 @@ func TestToSelection(t *testing.T) {
 			}
 			if got.Selection.Year != tt.wantYear {
 				t.Errorf("expected year %d, got %d", tt.wantYear, got.Selection.Year)
-			}
-			if got.Selection.Semester != tt.wantSemester {
-				t.Errorf("expected semester %d, got %d", tt.wantSemester, got.Selection.Semester)
 			}
 			if got.Selection.Institution != tt.wantInst {
 				t.Errorf("expected institution %q, got %q", tt.wantInst, got.Selection.Institution)

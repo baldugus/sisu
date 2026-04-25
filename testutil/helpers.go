@@ -16,7 +16,6 @@ func LoadApprovedSelection(t *testing.T, db *database.Database, filePath string)
 
 	cmd := commands.LoadSelectionCommand{
 		Year:     2025,
-		Semester: 1,
 		FilePath: filePath,
 		Kind:     types.SelectionKindApproved,
 	}
@@ -31,7 +30,6 @@ func LoadWaitlistSelection(t *testing.T, db *database.Database, filePath string)
 
 	cmd := commands.LoadSelectionCommand{
 		Year:     2025,
-		Semester: 1,
 		FilePath: filePath,
 		Kind:     types.SelectionKindWaitlist,
 	}
@@ -44,8 +42,13 @@ func LoadWaitlistSelection(t *testing.T, db *database.Database, filePath string)
 func CreateCall(t *testing.T, db *database.Database) int32 {
 	t.Helper()
 
-	cmd := commands.CreateCallCommand{}
-	err := cmd.Execute(db)
+	semester, err := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
+	require.NoError(t, err, "failed to fetch semester")
+
+	cmd := commands.CreateCallCommand{
+		SemesterID: semester.ID,
+	}
+	err = cmd.Execute(db)
 	require.NoError(t, err, "failed to create call")
 
 	// Get the last call number

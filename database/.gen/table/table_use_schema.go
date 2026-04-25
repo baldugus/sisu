@@ -16,4 +16,5 @@ func UseSchema(schema string) {
 	Quotas = Quotas.FromSchema(schema)
 	Registrations = Registrations.FromSchema(schema)
 	Selections = Selections.FromSchema(schema)
+	Semesters = Semesters.FromSchema(schema)
 }

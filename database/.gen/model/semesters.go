@@ -7,11 +7,9 @@
 
 package model
 
-type Selections struct {
-	ID          int32 `sql:"primary_key"`
-	Kind        string
-	Name        string
-	Year        int32
-	Institution string
-	Degree      string
+type Semesters struct {
+	ID     int32 `sql:"primary_key"`
+	Year   int32
+	Number int32
+	Status string
 }

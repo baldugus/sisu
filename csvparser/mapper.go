@@ -40,7 +40,7 @@ func (pc *ParsedCsv) toRegistrationsDomain(status types.RegistrationStatus) ([]*
 	return registrations, nil
 }
 
-func (pc *ParsedCsv) ToSelectionDomain(kind types.SelectionKind, year int32, semester int32) (*ParsedSelection, error) {
+func (pc *ParsedCsv) ToSelectionDomain(kind types.SelectionKind, year int32) (*ParsedSelection, error) {
 	registrationStatus, _ := types.ParseRegistrationStatus(kind.ToRegistrationStatus().String())
 	registrations, err := pc.toRegistrationsDomain(registrationStatus)
 	if err != nil {
@@ -55,7 +55,6 @@ func (pc *ParsedCsv) ToSelectionDomain(kind types.SelectionKind, year int32, sem
 		Name:        pc.name,
 		Kind:        kind,
 		Year:        year,
-		Semester:    semester,
 		Institution: pc.candidates[0].Institution,
 		Degree:      pc.candidates[0].Course,
 	}
@@ -132,6 +131,10 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "Seats", Err: err}
 	}
 
+	if status == types.RegistrationStatusApproved && seats%2 != 0 {
+		return nil, &ErrFieldValidation{Field: "Seats", Err: &ErrOddSeatsCount{Count: seats}}
+	}
+
 	option, err := strconv.ParseInt(a.Option, 10, 32)
 	if err != nil {
 		return nil, &ErrFieldValidation{Field: "Option", Err: err}
@@ -172,6 +175,15 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "Ranking", Err: err}
 	}
 
+	var semesterID *int32
+	if status == types.RegistrationStatusApproved {
+		sem := int32(2)
+		if ranking <= int(seats)/2 {
+			sem = 1
+		}
+		semesterID = &sem
+	}
+
 	var call *types.Call
 	if status == types.RegistrationStatusApproved {
 		call = &types.Call{}
@@ -189,6 +201,7 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 			EssayScore:           essayScore,
 			CompositeScore:       compositeScore,
 			Ranking:              int32(ranking),
+			SemesterID:           semesterID,
 			Candidate: &types.Candidate{
 				CPF:          a.CPF,
 				Name:         a.Name,

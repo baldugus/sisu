@@ -10,9 +10,8 @@ func NewTestSelection(overrides ...func(*types.Selection)) *types.Selection {
 	selection := &types.Selection{
 		Name:        "Test Selection",
 		Kind:        types.SelectionKindApproved,
-		Year:        2025,
-		Semester:    1,
-		Institution: "FAETERJ-Rio",
+		Year:        2024,
+		Institution: "Institution",
 		Degree:      "Tecnológico",
 	}
 

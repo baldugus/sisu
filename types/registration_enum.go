@@ -19,17 +19,20 @@ const (
 	RegistrationStatusAbsent
 	// RegistrationStatusEnrolled is a RegistrationStatus of type Enrolled.
 	RegistrationStatusEnrolled
+	// RegistrationStatusDeclinedPromotion is a RegistrationStatus of type Declined_promotion.
+	RegistrationStatusDeclinedPromotion
 )
 
 var ErrInvalidRegistrationStatus = errors.New("not a valid RegistrationStatus")
 
-const _RegistrationStatusName = "approvedwaitlistedabsentenrolled"
+const _RegistrationStatusName = "approvedwaitlistedabsentenrolleddeclined_promotion"
 
 var _RegistrationStatusMap = map[RegistrationStatus]string{
-	RegistrationStatusApproved:   _RegistrationStatusName[0:8],
-	RegistrationStatusWaitlisted: _RegistrationStatusName[8:18],
-	RegistrationStatusAbsent:     _RegistrationStatusName[18:24],
-	RegistrationStatusEnrolled:   _RegistrationStatusName[24:32],
+	RegistrationStatusApproved:          _RegistrationStatusName[0:8],
+	RegistrationStatusWaitlisted:        _RegistrationStatusName[8:18],
+	RegistrationStatusAbsent:            _RegistrationStatusName[18:24],
+	RegistrationStatusEnrolled:          _RegistrationStatusName[24:32],
+	RegistrationStatusDeclinedPromotion: _RegistrationStatusName[32:50],
 }
 
 // String implements the Stringer interface.
@@ -52,6 +55,7 @@ var _RegistrationStatusValue = map[string]RegistrationStatus{
 	_RegistrationStatusName[8:18]:  RegistrationStatusWaitlisted,
 	_RegistrationStatusName[18:24]: RegistrationStatusAbsent,
 	_RegistrationStatusName[24:32]: RegistrationStatusEnrolled,
+	_RegistrationStatusName[32:50]: RegistrationStatusDeclinedPromotion,
 }
 
 // ParseRegistrationStatus attempts to convert a string to a RegistrationStatus.
@@ -60,4 +64,28 @@ func ParseRegistrationStatus(name string) (RegistrationStatus, error) {
 		return x, nil
 	}
 	return RegistrationStatus(0), fmt.Errorf("%s is %w", name, ErrInvalidRegistrationStatus)
+}
+
+// MarshalText implements the text marshaller method.
+func (x RegistrationStatus) MarshalText() ([]byte, error) {
+	return []byte(x.String()), nil
+}
+
+// UnmarshalText implements the text unmarshaller method.
+func (x *RegistrationStatus) UnmarshalText(text []byte) error {
+	name := string(text)
+	tmp, err := ParseRegistrationStatus(name)
+	if err != nil {
+		return err
+	}
+	*x = tmp
+	return nil
+}
+
+// AppendText appends the textual representation of itself to the end of b
+// (allocating a larger slice if necessary) and returns the updated slice.
+//
+// Implementations must not retain b, nor mutate any bytes within b[:len(b)].
+func (x *RegistrationStatus) AppendText(b []byte) ([]byte, error) {
+	return append(b, x.String()...), nil
 }
