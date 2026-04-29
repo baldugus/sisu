@@ -15,7 +15,7 @@ require (
 	github.com/johnfercher/maroto/v2 v2.0.0-beta.3
 	github.com/stretchr/testify v1.11.1
 	github.com/wailsapp/wails/v2 v2.12.0
-	go.uber.org/zap v1.25.0
+	go.uber.org/zap v1.28.0
 	modernc.org/sqlite v1.25.0
 )
 
