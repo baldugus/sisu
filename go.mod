@@ -8,7 +8,7 @@ require (
 	github.com/alecthomas/kong v1.15.0
 	github.com/dimchansky/utfbom v1.1.1
 	github.com/gen2brain/go-fitz v1.24.15
-	github.com/go-jet/jet/v2 v2.14.1
+	github.com/go-jet/jet/v2 v2.15.0
 	github.com/gocarina/gocsv v0.0.0-20230616125104-99d496ca653d
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jmoiron/sqlx v1.3.5
