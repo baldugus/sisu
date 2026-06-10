@@ -203,6 +203,17 @@ func (a *App) FetchRollCalls() Response {
 	return Response{200, "OK", calls}
 }
 
+func (a *App) FetchSemesters() Response {
+	cmd := commands.FetchSemestersCommand{}
+
+	semesters, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return AppErrorToResponse(err)
+	}
+
+	return Response{200, "OK", semesters}
+}
+
 func (a *App) DeleteApprovedSelection() Response {
 	cmd := commands.DeleteSelectionCommand{
 		Kind: types.SelectionKindApproved,

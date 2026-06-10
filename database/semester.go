@@ -57,3 +57,21 @@ func FetchSemesterByYearAndNumber(db qrm.DB, year int32, number int32) (*types.S
 		Number: result.Number,
 	}, nil
 }
+
+func (d *Database) FetchSemesters() ([]*types.Semester, error) {
+	stmt := SELECT(Semesters.AllColumns).FROM(Semesters).ORDER_BY(Semesters.Number.ASC())
+	var results []model.Semesters
+	err := stmt.Query(d.db, &results)
+	if err != nil {
+		return nil, err
+	}
+	semesters := make([]*types.Semester, len(results))
+	for i, r := range results {
+		semesters[i] = &types.Semester{
+			ID:     r.ID,
+			Year:   r.Year,
+			Number: r.Number,
+		}
+	}
+	return semesters, nil
+}
