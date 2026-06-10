@@ -1,4 +1,4 @@
-# AGENTS.md - AI Coding Agent Guidelines
+# CLAUDE.md - AI Coding Agent Guidelines
 
 This document provides guidelines for AI coding agents working on the SISU codebase.
 
@@ -6,9 +6,9 @@ This document provides guidelines for AI coding agents working on the SISU codeb
 
 SISU is a full-stack desktop application for managing student admissions from Brazil's SiSU (Sistema de Selecao Unificada). It uses:
 - **Backend**: Go 1.24+ with Wails v2 framework
-- **Frontend**: React 18 + TypeScript + Vite
+- **Frontend**: React 18 + TypeScript + Vite — lives in a **git submodule** (`frontend/`), committed/tracked independently from the main repo
 - **Database**: SQLite with go-jet for queries and golang-migrate for migrations
-- **UI**: Tailwind CSS + Material Tailwind React
+- **UI**: Tailwind CSS + Material Tailwind React (frontend submodule is mid-migration to shadcn/ui)
 
 ## Build/Development Commands
 
@@ -85,7 +85,7 @@ sisu/
 │   └── .gen/            # Generated go-jet code (do not edit manually)
 ├── pdfbuilder/          # PDF report generation
 ├── types/               # Domain types and enums
-└── frontend/            # React/TypeScript frontend
+└── frontend/            # React/TypeScript frontend (git submodule — separate repo)
     ├── src/
     │   ├── components/  # Reusable UI components
     │   └── pages/       # Page components
@@ -243,6 +243,9 @@ go generate ./types/...
 
 # Regenerate go-jet models (requires running migrations first)
 jet -dsn="path/to/db.sqlite" -schema=main -path=./database/.gen
+
+# Regenerate frontend Wails JS/TS bindings (after adding/changing bound App methods in app.go)
+wails generate module
 ```
 
 ## Architecture
@@ -251,11 +254,12 @@ jet -dsn="path/to/db.sqlite" -schema=main -path=./database/.gen
 
 Domain types are intentionally kept flat without nested relationships:
 
-- `Selection` - Batch import metadata (name, kind, year, semester)
-- `Registration` - Candidate's application (scores, ranking, status, candidate)
-- `Course` - Academic program (period, seats, quota, minimum score)
-- `Call` - Enrollment call (status, number)
-- `Candidate` - Personal data (name, CPF, address, contact)
+- `Selection` — Yearly batch import metadata (name, kind, year, institution, degree). **No semester field** — selections are annual; semester is a separate entity. (`types/selection.go`)
+- `Semester` — Academic term within a selection year (ID, year, number 1|2, status open|closed). Auto-created when an approved selection is imported. (`types/semester.go`)
+- `Registration` — Candidate's application (scores, ranking, status, candidate, nullable `SemesterID`). Approved registrations carry a `SemesterID` (1 or 2); waitlisted registrations have `SemesterID = nil`. (`types/registration.go`)
+- `Course` — Academic program (period, seats, quota, minimum score)
+- `Call` — Enrollment call (status, number, `SemesterID`). Every call belongs to exactly one semester. (`types/call.go`)
+- `Candidate` — Personal data (name, CPF, address, contact)
 
 **Design principle**: Domain types don't embed related entities (e.g., `Registration` doesn't contain `Course` or `Call`). Relationships are managed at the database level via foreign keys.
 
@@ -338,10 +342,22 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 2. Parse CSV into `ParsedSelection`
 3. Run transaction: create selection, call, courses, candidates, registrations
 
+**Approved import specifics (`commands/load_selection.go`):**
+- Automatically finds-or-creates **Semester 1** and **Semester 2** records for the given year.
+- Splits approved candidates 50/50 by ranking: top half → Semester 1, bottom half → Semester 2.
+- The CSV must have an **even** total seat count per course; an odd count returns `ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres.").
+
+**Call creation specifics (`commands/create_call.go`):**
+- Requires a `SemesterID`. For a Semester-1 call, priority Semester-2 registrations (declined promotions) are promoted first, then remaining seats are filled from the waitlist.
+- Returns `ErrOpenCallExists` if another call is already open.
+
 ## Domain Notes
 
-- **Selection**: A batch import of candidates (approved or waitlist)
-- **Registration**: A candidate's application to a course
-- **Call/Rollcall**: An enrollment call where approved candidates can enroll
+- **Selection**: A yearly batch import of candidates (approved or waitlist). Approved selections auto-create Semesters 1 and 2 and split candidates 50/50 by ranking.
+- **Semester**: An academic term (Number 1 or 2) within a selection year. Calls and approved registrations are tied to a semester. Created automatically on approved import — not created by the user directly.
+- **Registration**: A candidate's application to a course. Approved registrations have a `SemesterID`; waitlisted registrations do not.
+- **`declined_promotion`** status: a Semester-2 candidate who declined promotion to Semester 1. Can transition back to `approved`. Tracked via `RegistrationStatus` enum in `types/registration.go`.
+- **Call/Rollcall**: An enrollment call for a specific semester where approved candidates can enroll or be marked absent.
 - **Course**: Academic program with period (morning/evening) and quota info
 - Messages and UI are in Portuguese (pt-BR)
+- See **`API_CHANGELOG.md`** in the repo root for the detailed API diff of the semester/yearly-import rework.
