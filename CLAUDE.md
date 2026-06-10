@@ -360,4 +360,4 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 - **Call/Rollcall**: An enrollment call for a specific semester where approved candidates can enroll or be marked absent.
 - **Course**: Academic program with period (morning/evening) and quota info
 - Messages and UI are in Portuguese (pt-BR)
-- See **`API_CHANGELOG.md`** in the repo root for the detailed API diff of the semester/yearly-import rework.
+- See **`docs/api-changelog.md`** for the detailed API diff of the semester/yearly-import rework.
