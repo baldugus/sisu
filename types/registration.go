@@ -1,24 +1,18 @@
 package types
 
-import "encoding/json"
-
 // ENUM(approved, waitlisted, absent, enrolled, declined_promotion)
-type RegistrationStatus int
-
-func (rs RegistrationStatus) MarshalJSON() ([]byte, error) {
-	return json.Marshal(rs.String())
-}
+type RegistrationStatus string
 
 type Registration struct {
 	ID                   int32              `csv:"-"`
 	EnrollmentID         string             `csv:"INSCRICAO_ENEM"`
 	Option               int32              `csv:"OPCAO"`
-	LanguagesScore       *Score             `csv:"NOTA_LINGUAGENS"`
-	HumanitiesScore      *Score             `csv:"NOTA_HUMANAS"`
-	NaturalSciencesScore *Score             `csv:"NOTA_NATUREZA"`
-	MathematicsScore     *Score             `csv:"NOTA_MATEMATICA"`
-	EssayScore           *Score             `csv:"NOTA_REDACAO"`
-	CompositeScore       *Score             `csv:"NOTA_FINAL"`
+	LanguagesScore       *Score             `csv:"NOTA_LINGUAGENS" ts_type:"string"`
+	HumanitiesScore      *Score             `csv:"NOTA_HUMANAS" ts_type:"string"`
+	NaturalSciencesScore *Score             `csv:"NOTA_NATUREZA" ts_type:"string"`
+	MathematicsScore     *Score             `csv:"NOTA_MATEMATICA" ts_type:"string"`
+	EssayScore           *Score             `csv:"NOTA_REDACAO" ts_type:"string"`
+	CompositeScore       *Score             `csv:"NOTA_FINAL" ts_type:"string"`
 	Ranking              int32              `csv:"CLASSIFICACAO"`
 	Status               RegistrationStatus `csv:"SITUACAO"`
 	Candidate            *Candidate

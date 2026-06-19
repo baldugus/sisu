@@ -1,9 +1,7 @@
 package types
 
-import "encoding/json"
-
 // ENUM(approved, waitlist)
-type SelectionKind int
+type SelectionKind string
 
 func (s SelectionKind) ToRegistrationStatus() RegistrationStatus {
 	switch s.String() {
@@ -12,12 +10,8 @@ func (s SelectionKind) ToRegistrationStatus() RegistrationStatus {
 	case "waitlist":
 		return RegistrationStatusWaitlisted
 	default:
-		return -1
+		return ""
 	}
-}
-
-func (s SelectionKind) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.String())
 }
 
 type Selection struct {

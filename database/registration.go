@@ -264,7 +264,7 @@ func (d *Database) FetchSelectionKindByRegistrationID(registrationID int32) (typ
 
 	err := stmt.Query(d.db, &result)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	return types.ParseSelectionKind(result.Kind)

@@ -11,39 +11,29 @@ import (
 )
 
 const (
-	// CoursePeriodMorning is a CoursePeriod of type Morning.
-	CoursePeriodMorning CoursePeriod = iota
-	// CoursePeriodEvening is a CoursePeriod of type Evening.
-	CoursePeriodEvening
+	// CoursePeriodMorning is a CoursePeriod of type morning.
+	CoursePeriodMorning CoursePeriod = "morning"
+	// CoursePeriodEvening is a CoursePeriod of type evening.
+	CoursePeriodEvening CoursePeriod = "evening"
 )
 
 var ErrInvalidCoursePeriod = errors.New("not a valid CoursePeriod")
 
-const _CoursePeriodName = "morningevening"
-
-var _CoursePeriodMap = map[CoursePeriod]string{
-	CoursePeriodMorning: _CoursePeriodName[0:7],
-	CoursePeriodEvening: _CoursePeriodName[7:14],
-}
-
 // String implements the Stringer interface.
 func (x CoursePeriod) String() string {
-	if str, ok := _CoursePeriodMap[x]; ok {
-		return str
-	}
-	return fmt.Sprintf("CoursePeriod(%d)", x)
+	return string(x)
 }
 
 // IsValid provides a quick way to determine if the typed value is
 // part of the allowed enumerated values
 func (x CoursePeriod) IsValid() bool {
-	_, ok := _CoursePeriodMap[x]
-	return ok
+	_, err := ParseCoursePeriod(string(x))
+	return err == nil
 }
 
 var _CoursePeriodValue = map[string]CoursePeriod{
-	_CoursePeriodName[0:7]:  CoursePeriodMorning,
-	_CoursePeriodName[7:14]: CoursePeriodEvening,
+	"morning": CoursePeriodMorning,
+	"evening": CoursePeriodEvening,
 }
 
 // ParseCoursePeriod attempts to convert a string to a CoursePeriod.
@@ -51,5 +41,5 @@ func ParseCoursePeriod(name string) (CoursePeriod, error) {
 	if x, ok := _CoursePeriodValue[name]; ok {
 		return x, nil
 	}
-	return CoursePeriod(0), fmt.Errorf("%s is %w", name, ErrInvalidCoursePeriod)
+	return CoursePeriod(""), fmt.Errorf("%s is %w", name, ErrInvalidCoursePeriod)
 }

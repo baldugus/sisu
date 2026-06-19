@@ -1,11 +1,16 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
 type Score struct {
 	Value int32
+}
+
+func (s Score) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
 }
 
 func NewScoreFromFloat(value float32) Score {

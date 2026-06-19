@@ -11,51 +11,38 @@ import (
 )
 
 const (
-	// RegistrationStatusApproved is a RegistrationStatus of type Approved.
-	RegistrationStatusApproved RegistrationStatus = iota
-	// RegistrationStatusWaitlisted is a RegistrationStatus of type Waitlisted.
-	RegistrationStatusWaitlisted
-	// RegistrationStatusAbsent is a RegistrationStatus of type Absent.
-	RegistrationStatusAbsent
-	// RegistrationStatusEnrolled is a RegistrationStatus of type Enrolled.
-	RegistrationStatusEnrolled
-	// RegistrationStatusDeclinedPromotion is a RegistrationStatus of type Declined_promotion.
-	RegistrationStatusDeclinedPromotion
+	// RegistrationStatusApproved is a RegistrationStatus of type approved.
+	RegistrationStatusApproved RegistrationStatus = "approved"
+	// RegistrationStatusWaitlisted is a RegistrationStatus of type waitlisted.
+	RegistrationStatusWaitlisted RegistrationStatus = "waitlisted"
+	// RegistrationStatusAbsent is a RegistrationStatus of type absent.
+	RegistrationStatusAbsent RegistrationStatus = "absent"
+	// RegistrationStatusEnrolled is a RegistrationStatus of type enrolled.
+	RegistrationStatusEnrolled RegistrationStatus = "enrolled"
+	// RegistrationStatusDeclinedPromotion is a RegistrationStatus of type declined_promotion.
+	RegistrationStatusDeclinedPromotion RegistrationStatus = "declined_promotion"
 )
 
 var ErrInvalidRegistrationStatus = errors.New("not a valid RegistrationStatus")
 
-const _RegistrationStatusName = "approvedwaitlistedabsentenrolleddeclined_promotion"
-
-var _RegistrationStatusMap = map[RegistrationStatus]string{
-	RegistrationStatusApproved:          _RegistrationStatusName[0:8],
-	RegistrationStatusWaitlisted:        _RegistrationStatusName[8:18],
-	RegistrationStatusAbsent:            _RegistrationStatusName[18:24],
-	RegistrationStatusEnrolled:          _RegistrationStatusName[24:32],
-	RegistrationStatusDeclinedPromotion: _RegistrationStatusName[32:50],
-}
-
 // String implements the Stringer interface.
 func (x RegistrationStatus) String() string {
-	if str, ok := _RegistrationStatusMap[x]; ok {
-		return str
-	}
-	return fmt.Sprintf("RegistrationStatus(%d)", x)
+	return string(x)
 }
 
 // IsValid provides a quick way to determine if the typed value is
 // part of the allowed enumerated values
 func (x RegistrationStatus) IsValid() bool {
-	_, ok := _RegistrationStatusMap[x]
-	return ok
+	_, err := ParseRegistrationStatus(string(x))
+	return err == nil
 }
 
 var _RegistrationStatusValue = map[string]RegistrationStatus{
-	_RegistrationStatusName[0:8]:   RegistrationStatusApproved,
-	_RegistrationStatusName[8:18]:  RegistrationStatusWaitlisted,
-	_RegistrationStatusName[18:24]: RegistrationStatusAbsent,
-	_RegistrationStatusName[24:32]: RegistrationStatusEnrolled,
-	_RegistrationStatusName[32:50]: RegistrationStatusDeclinedPromotion,
+	"approved":           RegistrationStatusApproved,
+	"waitlisted":         RegistrationStatusWaitlisted,
+	"absent":             RegistrationStatusAbsent,
+	"enrolled":           RegistrationStatusEnrolled,
+	"declined_promotion": RegistrationStatusDeclinedPromotion,
 }
 
 // ParseRegistrationStatus attempts to convert a string to a RegistrationStatus.
@@ -63,29 +50,5 @@ func ParseRegistrationStatus(name string) (RegistrationStatus, error) {
 	if x, ok := _RegistrationStatusValue[name]; ok {
 		return x, nil
 	}
-	return RegistrationStatus(0), fmt.Errorf("%s is %w", name, ErrInvalidRegistrationStatus)
-}
-
-// MarshalText implements the text marshaller method.
-func (x RegistrationStatus) MarshalText() ([]byte, error) {
-	return []byte(x.String()), nil
-}
-
-// UnmarshalText implements the text unmarshaller method.
-func (x *RegistrationStatus) UnmarshalText(text []byte) error {
-	name := string(text)
-	tmp, err := ParseRegistrationStatus(name)
-	if err != nil {
-		return err
-	}
-	*x = tmp
-	return nil
-}
-
-// AppendText appends the textual representation of itself to the end of b
-// (allocating a larger slice if necessary) and returns the updated slice.
-//
-// Implementations must not retain b, nor mutate any bytes within b[:len(b)].
-func (x *RegistrationStatus) AppendText(b []byte) ([]byte, error) {
-	return append(b, x.String()...), nil
+	return RegistrationStatus(""), fmt.Errorf("%s is %w", name, ErrInvalidRegistrationStatus)
 }
