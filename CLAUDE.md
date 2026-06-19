@@ -8,7 +8,7 @@ SISU is a full-stack desktop application for managing student admissions from Br
 - **Backend**: Go 1.24+ with Wails v2 framework
 - **Frontend**: React 18 + TypeScript + Vite — lives in a **git submodule** (`frontend/`), committed/tracked independently from the main repo
 - **Database**: SQLite with go-jet for queries and golang-migrate for migrations
-- **UI**: Tailwind CSS + Material Tailwind React (frontend submodule is mid-migration to shadcn/ui)
+- **UI**: Tailwind CSS v4 + shadcn/ui (migration off Material Tailwind is complete)
 
 ## Build/Development Commands
 
@@ -85,10 +85,14 @@ sisu/
 │   └── .gen/            # Generated go-jet code (do not edit manually)
 ├── pdfbuilder/          # PDF report generation
 ├── types/               # Domain types and enums
+├── testutil/            # Test fixtures, helpers, and assertions for integration tests
 └── frontend/            # React/TypeScript frontend (git submodule — separate repo)
     ├── src/
-    │   ├── components/  # Reusable UI components
-    │   └── pages/       # Page components
+    │   ├── components/  # Reusable UI components (Tailwind v4 + shadcn/ui)
+    │   ├── pages/       # Page components (Portuguese names, e.g. Painel, Chamadas, Dados)
+    │   ├── hooks/       # Custom React hooks
+    │   ├── lib/         # Frontend utilities (e.g. wailsCall wrapper)
+    │   └── mocks/       # Mock backend for frontend-only dev
     └── wailsjs/         # Auto-generated Wails JS bindings (do not edit)
 ```
 
@@ -351,6 +355,22 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 - Requires a `SemesterID`. For a Semester-1 call, priority Semester-2 registrations (declined promotions) are promoted first, then remaining seats are filled from the waitlist.
 - Returns `ErrOpenCallExists` if another call is already open.
 
+### Wails Boundary (`app.go`)
+
+Every bound `App` method returns a concrete typed value plus `error` — there is no
+`Response{ Status; Msg; Data any }` wrapper. On success, Wails resolves the JS promise with
+the typed value (`*types.Selection`, `[]*types.Registration`, etc., or nothing for action
+methods); on failure it rejects with an `Error` whose `.message` is the Portuguese
+user-facing string produced by `translateError()` (`app.go`).
+
+- Enums (`RegistrationStatus`, `SelectionKind`, `CallStatus`, `CoursePeriod`) serialize as
+  string literals (e.g. `"approved"`), not numeric codes.
+- `*Score` fields (`types/score.go`) serialize as a formatted string (e.g. `"655,16"`), not
+  a numeric struct.
+- `wails generate module` regenerates `frontend/wailsjs/go/main/App.d.ts` and `models.ts`
+  with these concrete TS types, so a shape change now fails at `tsc` time on the frontend
+  instead of silently drifting.
+
 ## Domain Notes
 
 - **Selection**: A yearly batch import of candidates (approved or waitlist). Approved selections auto-create Semesters 1 and 2 and split candidates 50/50 by ranking.
@@ -360,4 +380,4 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 - **Call/Rollcall**: An enrollment call for a specific semester where approved candidates can enroll or be marked absent.
 - **Course**: Academic program with period (morning/evening) and quota info
 - Messages and UI are in Portuguese (pt-BR)
-- See **`docs/api-changelog.md`** for the detailed API diff of the semester/yearly-import rework.
+- See **`docs/future-work.md`** for the design-improvement backlog and **`docs/testing.md`** for the integration-testing guide.

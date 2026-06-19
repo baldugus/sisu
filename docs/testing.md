@@ -56,7 +56,7 @@ Create test domain objects with sensible defaults:
 // Create custom selection
 selection := testutil.NewTestSelection(func(s *types.Selection) {
     s.Year = 2026
-    s.Semester = 2
+    s.Kind = types.SelectionKindWaitlist
 })
 
 // Create custom candidate
@@ -83,6 +83,7 @@ testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
 testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_small.csv")
 
 // Create and manage calls
+// (resolves Semester 1 of year 2025 internally via FetchSemesterByYearAndNumber)
 callID := testutil.CreateCall(t, db.Database)
 testutil.CloseCall(t, db.Database, callID)
 testutil.CloseCallWithEnrollment(t, db.Database, callID) // Enrolls all first
@@ -382,4 +383,4 @@ go test -timeout 30s ./...
 - **Database**: 70%+ (CRUD operations)
 - **Overall**: 60%+ (entire codebase)
 
-Current coverage: 26.9% commands (integration tests only - actual coverage higher when including unit tests)
+Coverage varies by package and changes as tests are added — run `go test ./... -cover` for current numbers rather than relying on a figure recorded here.
