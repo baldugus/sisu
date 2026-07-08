@@ -7,7 +7,7 @@ toolchain go1.24.5
 require (
 	github.com/alecthomas/kong v1.15.0
 	github.com/dimchansky/utfbom v1.1.1
-	github.com/gen2brain/go-fitz v1.24.15
+	github.com/gen2brain/go-fitz v1.28.2
 	github.com/go-jet/jet/v2 v2.14.1
 	github.com/gocarina/gocsv v0.0.0-20230616125104-99d496ca653d
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -31,7 +31,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ebitengine/purego v0.8.4 // indirect
+	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/f-amaral/go-async v0.3.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -44,7 +44,6 @@ require (
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/johnfercher/go-tree v1.0.5 // indirect
 	github.com/jung-kurt/gofpdf v1.16.2 // indirect
-	github.com/jupiterrider/ffi v0.5.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
