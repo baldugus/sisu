@@ -1,7 +1,7 @@
 # CLAUDE.md — SISU Frontend
 
-Guidelines for AI agents working in the SISU **frontend** (this repo). The frontend is a
-**git submodule** of the main SISU repo, versioned independently.
+Guidelines for AI agents working in the SISU **frontend** (`frontend/` of the SISU monorepo).
+See the root `../CLAUDE.md` for the backend and project-wide conventions.
 
 ## Overview
 
@@ -19,7 +19,7 @@ Run from this directory:
 
 ```bash
 npm install          # install deps
-npm run dev          # Vite dev server (usually launched via `wails dev` from the parent repo)
+npm run dev          # Vite dev server (usually launched via `wails dev` from the repo root)
 npm run build        # tsc + vite build
 npx tsc --noEmit     # type-check only
 ```
@@ -88,19 +88,18 @@ are the canonical shadcn pages. Page shell + header:
 
 ## Backend data (Wails bindings)
 
-- Bound methods live in `wailsjs/go/main/App` and each returns `Promise<main.Response>`:
-  ```ts
-  class Response { status: number; msg: string; data: any }
-  ```
-- **`data` is untyped (`any`).** The real shapes are the Go structs in the parent repo's `types/`
-  package. When unsure of a field, read the Go source (`../types/*.go`) — do not guess.
+- Bound methods live in `wailsjs/go/main/App` and return concrete typed values
+  (models in `wailsjs/go/models.ts`). On failure the promise rejects with an `Error` whose
+  `.message` is a pt-BR user-facing string. See "Wails Boundary" in `../CLAUDE.md`.
+- The real shapes are the Go structs in `../types/`. When unsure of a field, read the Go
+  source (`../types/*.go`) — do not guess.
 - After adding/changing a bound Go method, bindings are regenerated with
-  `wails generate module` (run from the parent repo). Never hand-edit `wailsjs/`.
+  `wails generate module` (run from the repo root). Never hand-edit `wailsjs/`.
 
 ### Data shapes (from `../types/`)
 
 - **Selection** — yearly batch: `ID, Name, Kind ("approved"|"waitlist"), Year, Institution, Degree`.
-- **Registration** — an application: `ID, EnrollmentID, Option, *Score fields (.Value),
+- **Registration** — an application: `ID, EnrollmentID, Option, *Score fields (formatted strings, e.g. "655,16"),
   Ranking, Status, Candidate, SemesterID (*int32)`.
   `Status` values: `approved | waitlisted | absent | enrolled | declined_promotion`.
 - **RegistrationDetail** — `{ Registration, Course, Call }`.

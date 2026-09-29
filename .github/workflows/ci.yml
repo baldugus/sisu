@@ -5,13 +5,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  go-test-and-lint:
+  build-test-and-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # main.go embeds frontend/dist, so the frontend must be built before
+      # the root package can compile (tests and lint).
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          submodules: true
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
 
       - name: Setup Go
         uses: actions/setup-go@v5
