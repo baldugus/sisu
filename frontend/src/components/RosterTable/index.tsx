@@ -18,9 +18,9 @@ import { toast } from 'sonner';
 import { RegistrationDialog } from './RegistrationDialog';
 import { CopyEmailButton } from './CopyEmailButton';
 import {
-  ClearApplicationStatus,
-  AbsentApplication,
-  EnrollApplication,
+  ClearRegistrationStatus,
+  AbsentRegistration,
+  EnrollRegistration,
 } from '@/lib/backend';
 
 export interface RowData {
@@ -207,9 +207,9 @@ export function RosterTable({
     setBulkApplying(true);
     try {
       for (const id of ids) {
-        if (bulkStatus === 'APPROVED') await ClearApplicationStatus(id);
-        else if (bulkStatus === 'ABSENT') await AbsentApplication(id);
-        else if (bulkStatus === 'ENROLLED') await EnrollApplication(id);
+        if (bulkStatus === 'APPROVED') await ClearRegistrationStatus(id);
+        else if (bulkStatus === 'ABSENT') await AbsentRegistration(id);
+        else if (bulkStatus === 'ENROLLED') await EnrollRegistration(id);
       }
       setSelectedIds(new Set());
       onRefresh?.();

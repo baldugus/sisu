@@ -152,10 +152,6 @@ func (a *App) LoadWaitlistSelection(year int32, filePath string) error {
 	return nil
 }
 
-func (a *App) LoadInterestedSelection(year int32, filePath string) error {
-	return a.LoadWaitlistSelection(year, filePath)
-}
-
 func (a *App) FetchApprovedSelection() (*types.Selection, error) {
 	cmd := commands.FetchSelectionCommand{
 		Kind: types.SelectionKindApproved,
@@ -172,7 +168,7 @@ func (a *App) FetchApprovedSelection() (*types.Selection, error) {
 	return selection, nil
 }
 
-func (a *App) FetchInterestedSelection() (*types.Selection, error) {
+func (a *App) FetchWaitlistSelection() (*types.Selection, error) {
 	cmd := commands.FetchSelectionCommand{
 		Kind: types.SelectionKindWaitlist,
 	}
@@ -188,7 +184,7 @@ func (a *App) FetchInterestedSelection() (*types.Selection, error) {
 	return selection, nil
 }
 
-func (a *App) FetchRollCalls() ([]*types.Call, error) {
+func (a *App) FetchCalls() ([]*types.Call, error) {
 	cmd := commands.FetchCallsCommand{}
 
 	calls, err := cmd.Execute(a.sisu.database)
@@ -222,7 +218,7 @@ func (a *App) DeleteApprovedSelection() error {
 	return nil
 }
 
-func (a *App) DeleteInterestedSelection() error {
+func (a *App) DeleteWaitlistSelection() error {
 	cmd := commands.DeleteSelectionCommand{
 		Kind: types.SelectionKindWaitlist,
 	}
@@ -297,7 +293,7 @@ func (a *App) FetchRegistration(registrationID int32) (*types.RegistrationDetail
 	return registration, nil
 }
 
-func (a *App) CloseRollCall(id int32) error {
+func (a *App) CloseCall(id int32) error {
 	cmd := commands.CloseCallCommand{
 		ID: id,
 	}
@@ -348,23 +344,7 @@ func (a *App) ClearRegistrationStatus(id int32) error {
 	return nil
 }
 
-func (a *App) EnrollApplication(id int32) error {
-	return a.EnrollRegistration(id)
-}
-
-func (a *App) AbsentApplication(id int32) error {
-	return a.AbsentRegistration(id)
-}
-
-func (a *App) ClearApplicationStatus(id int32) error {
-	return a.ClearRegistrationStatus(id)
-}
-
-func (a *App) FetchApplicationsByRollCall(callID int32) ([]*types.Registration, error) {
-	return a.FetchRegistrationsByCallID(callID)
-}
-
-func (a *App) CreateRollCall(semesterID int32) error {
+func (a *App) CreateCall(semesterID int32) error {
 	cmd := commands.CreateCallCommand{SemesterID: semesterID}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {
@@ -396,18 +376,6 @@ func (a *App) DeleteCall(id int32) error {
 	}
 
 	return nil
-}
-
-func (a *App) OpenRollCall(id int32) error {
-	return a.OpenCall(id)
-}
-
-func (a *App) DeleteRollCall(id int32) error {
-	return a.DeleteCall(id)
-}
-
-func (a *App) DeleteRollcall(id int32) error {
-	return a.DeleteCall(id)
 }
 
 func (a *App) WebsitePDF(callID int32, period string, filePath string) error {

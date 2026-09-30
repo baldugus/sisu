@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  FetchRollCalls,
+  FetchCalls,
   FetchSemesters,
-  CreateRollCall,
-  OpenRollCall,
-  CloseRollCall,
-  DeleteRollcall,
+  CreateCall,
+  OpenCall,
+  CloseCall,
+  DeleteCall,
 } from '@/lib/backend';
 
 interface RollCall {
@@ -115,7 +115,7 @@ export default function Chamadas() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const raw = await FetchRollCalls() ?? [];
+      const raw = await FetchCalls() ?? [];
       setCalls(raw.map((c) => ({
         ID: c.ID,
         Number: c.Number,
@@ -151,7 +151,7 @@ export default function Chamadas() {
         toast.error('Nenhum semestre aberto encontrado.');
         return;
       }
-      await CreateRollCall(openSemester.ID);
+      await CreateCall(openSemester.ID);
       await load();
       toast.success('Nova chamada criada.');
     } catch (e: any) {
@@ -204,10 +204,10 @@ export default function Chamadas() {
               call={call}
               isLast={i === calls.length - 1}
               onDetail={() => navigate(`/chamadas/${call.ID}`)}
-              onOpen={() => act(() => OpenRollCall(call.ID), `${call.Number}ª chamada reaberta.`)}
-              onClose={() => act(() => CloseRollCall(call.ID), `${call.Number}ª chamada fechada.`)}
+              onOpen={() => act(() => OpenCall(call.ID), `${call.Number}ª chamada reaberta.`)}
+              onClose={() => act(() => CloseCall(call.ID), `${call.Number}ª chamada fechada.`)}
               canDelete={calls.length > 1}
-              onDelete={() => act(() => DeleteRollcall(call.ID), `${call.Number}ª chamada removida.`)}
+              onDelete={() => act(() => DeleteCall(call.ID), `${call.Number}ª chamada removida.`)}
             />
           ))}
         </div>

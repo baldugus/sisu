@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { RowData } from '@/components/RosterTable';
 import {
   FetchApprovedSelection,
-  FetchInterestedSelection,
+  FetchWaitlistSelection,
   FetchRegistrationsBySelectionID,
   FetchRegistration,
 } from '@/lib/backend';
@@ -53,7 +53,7 @@ export function useSelectionRows(kind: 'approved' | 'waitlisted') {
     setLoading(true);
     setError(null);
     try {
-      const getter = kind === 'approved' ? FetchApprovedSelection : FetchInterestedSelection;
+      const getter = kind === 'approved' ? FetchApprovedSelection : FetchWaitlistSelection;
       const defaultStatus = kind === 'approved' ? 'APPROVED' : 'WAITLISTED';
       const data = await loadRowsForSelection(getter, defaultStatus);
       setRows(data);

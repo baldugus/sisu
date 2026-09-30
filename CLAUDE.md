@@ -365,6 +365,10 @@ the typed value (`*types.Selection`, `[]*types.Registration`, etc., or nothing f
 methods); on failure it rejects with an `Error` whose `.message` is the Portuguese
 user-facing string produced by `translateError()` (`app.go`).
 
+- One vocabulary, no aliases: bound names use the domain terms `Registration` (never
+  "Application"), `Call` (never "RollCall") and `Waitlist` (never "Interested"), e.g.
+  `EnrollRegistration`, `FetchCalls`, `LoadWaitlistSelection`. UI-only identifiers (e.g. the
+  `useRollCallRows` hook) may use screen language, but don't add bound aliases.
 - Enums (`RegistrationStatus`, `SelectionKind`, `CallStatus`, `CoursePeriod`) serialize as
   string literals (e.g. `"approved"`), not numeric codes.
 - `*Score` fields (`types/score.go`) serialize as a formatted string (e.g. `"655,16"`), not

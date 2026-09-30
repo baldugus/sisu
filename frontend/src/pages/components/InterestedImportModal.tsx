@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { OpenFileDialog, LoadInterestedSelection } from "@/lib/backend";
+import { OpenFileDialog, LoadWaitlistSelection } from "@/lib/backend";
 
 interface Props {
   onClose: () => void;
@@ -32,7 +32,7 @@ export default function InterestedImportModal({ onClose, onSuccess, onError }: P
     if (!filePath || !year) return;
     setBusy(true);
     try {
-      await LoadInterestedSelection(Number(year), filePath);
+      await LoadWaitlistSelection(Number(year), filePath);
       onSuccess("Lista de espera importada com sucesso.");
     } catch (e: any) {
       onError(e?.message ?? "Falha ao importar lista de espera.");
