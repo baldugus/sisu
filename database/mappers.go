@@ -211,8 +211,8 @@ func toCourseModel(course *types.Course) *model.Courses {
 func toCourseDomain(course *model.Courses, quotaName string) (*types.Course, error) {
 	period, _ := types.ParseCoursePeriod(course.TimeSlot)
 
-	// The courses_seats_even triggers keep odd seat counts out of the database,
-	// so this only fails on a database written outside the app.
+	// The courses.seats CHECK constraint keeps odd seat counts out of the
+	// database, so this only fails on a database written outside the app.
 	seats, err := types.NewSeats(course.Seats)
 	if err != nil {
 		return nil, fmt.Errorf("map course %d: %w", course.ID, err)

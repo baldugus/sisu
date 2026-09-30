@@ -10,9 +10,9 @@ import (
 	"github.com/baldugus/sisu/database"
 )
 
-// The courses_seats_even triggers keep odd seat counts out of the database even
-// when a row is written without going through types.NewSeats.
-func TestCoursesSeatsEvenTriggers(t *testing.T) {
+// The courses.seats CHECK constraint keeps odd seat counts out of the database
+// even when a row is written without going through types.NewSeats.
+func TestCoursesSeatsEvenConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
 		stmt    string
@@ -51,7 +51,7 @@ func TestCoursesSeatsEvenTriggers(t *testing.T) {
 			_, err = db.DB().ExecContext(ctx, tt.stmt)
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), "courses.seats must be even")
+				assert.Contains(t, err.Error(), "CHECK constraint failed")
 				return
 			}
 

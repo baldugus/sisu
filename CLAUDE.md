@@ -266,7 +266,7 @@ Domain types are intentionally kept flat without nested relationships:
 - `Selection` — Yearly batch import metadata (name, kind, year, institution, degree). **No semester field** — selections are annual; semester is a separate entity. (`types/selection.go`)
 - `Semester` — Academic term within a selection year (ID, year, number 1|2, status open|closed). Auto-created when an approved selection is imported. (`types/semester.go`)
 - `Registration` — Candidate's application (scores, ranking, status, candidate, nullable `SemesterID`). Approved registrations carry a `SemesterID` (1 or 2); waitlisted registrations have `SemesterID = nil`. (`types/registration.go`)
-- `Course` — Academic program (period, seats, quota, minimum score). `Seats` is a `types.Seats` value (`types/seats.go`) that stores the per-semester count, so an odd total is unrepresentable; build it with `types.NewSeats(total)` (returns `ErrOddSeatsCount` on odd). The database backs this with the `courses_seats_even` triggers (migration `000002`).
+- `Course` — Academic program (period, seats, quota, minimum score). `Seats` is a `types.Seats` value (`types/seats.go`) that stores the per-semester count, so an odd total is unrepresentable; build it with `types.NewSeats(total)` (returns `ErrOddSeatsCount` on odd). The database backs this with a `CHECK (seats % 2 = 0)` on `courses`.
 - `Call` — Enrollment call (status, number, `SemesterID`). Every call belongs to exactly one semester. (`types/call.go`)
 - `Candidate` — Personal data (name, CPF, address, contact)
 
