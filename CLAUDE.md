@@ -264,13 +264,29 @@ wails generate module
 Domain types are intentionally kept flat without nested relationships:
 
 - `Selection` — Yearly batch import metadata (name, kind, year, institution, degree). **No semester field** — selections are annual; semester is a separate entity. (`types/selection.go`)
-- `Semester` — Academic term within a selection year (ID, year, number 1|2, status open|closed). Auto-created when an approved selection is imported. (`types/semester.go`)
-- `Registration` — Candidate's application (scores, ranking, status, candidate, nullable `SemesterID`). Approved registrations carry a `SemesterID` (1 or 2); waitlisted registrations have `SemesterID = nil`. (`types/registration.go`)
-- `Course` — Academic program (period, seats, quota, minimum score). `Seats` is a `types.Seats` value (`types/seats.go`) that stores the per-semester count, so an odd total is unrepresentable; build it with `types.NewSeats(total)` (returns `ErrOddSeatsCount` on odd). The database backs this with a `CHECK (seats % 2 = 0)` on `courses`.
-- `Call` — Enrollment call (status, number, `SemesterID`). Every call belongs to exactly one semester. (`types/call.go`)
+- `Semester` — One of the two fixed intakes (`Number` 1|2). Both rows are **seeded by the migration** and always exist; only their closure changes (`ClosedAfterCall`, derived `Status` open|closed). `FetchSemesters` also returns `Seats` and `Occupied`. (`types/semester.go`)
+- `Registration` — Candidate's application: **imported data only** (scores, ranking, candidate). `Status` and `Semester` are **derived** from its call entries, never stored. (`types/registration.go`)
+- `Course` — Academic program (period, seats, quota, minimum score). `Seats` is a `types.Seats` value (`types/seats.go`) that stores the per-semester count, so an odd total is unrepresentable; build it with `types.NewSeats(total)` (returns `ErrOddSeatsCount` on odd). The database backs this with a `CHECK (seats % 2 = 0)` on `courses`. Each semester gets `Seats.PerSemester()`.
+- `Call` — Enrollment call (status, number). A call covers **both** semesters; each entry says which. (`types/call.go`)
+- `CallEntry` — One registration taking part in one call: `Kind` (initial|waitlist|promotion), `Semester`, `Outcome` (pending|enrolled|absent|declined), `WantsPromotion`. (`types/call_entry.go`)
 - `Candidate` — Personal data (name, CPF, address, contact)
 
 **Design principle**: Domain types don't embed related entities (e.g., `Registration` doesn't contain `Course` or `Call`). Relationships are managed at the database level via foreign keys.
+
+### Admission cycle state: call entries (`call_entries` table)
+
+Everything that happens during the cycle is recorded as **call entries owned by the call that
+caused it**; registrations are never updated. This is what makes every action undoable in
+reverse order — deleting a call deletes its entries (`ON DELETE CASCADE`) and all of its
+effects disappear with them, with nothing to restore.
+
+- **Placement** (view `registration_placements`): a registration's current state is its entry
+  from the latest call, ignoring promotion offers that were not accepted. No entry = waitlisted;
+  `pending` → `approved` (called); `enrolled`; `absent`.
+- **Occupied seats** per (course, semester) = placements that are `pending` or `enrolled`.
+- **Undo stack**: only the last call can be reopened/deleted; call 1 is only removed by deleting
+  the approved selection; a semester closure (recorded as `closed_after_call`) must be undone
+  before the calls it follows. Undoing everything returns to the state right after the import.
 
 ### CSV Parser (`csvparser/`)
 
@@ -352,13 +368,15 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 3. Run transaction: create selection, call, courses, candidates, registrations
 
 **Approved import specifics (`commands/load_selection.go`):**
-- Automatically finds-or-creates **Semester 1** and **Semester 2** records for the given year.
-- Splits approved candidates 50/50 by ranking: top half → Semester 1, bottom half → Semester 2. The rule lives in the domain method `Course.SemesterForRanking` (`types/course.go`), called per registration by the command; the CSV parser never sets `SemesterID`.
+- Creates call 1 with an `initial` entry for every approved student.
+- Splits approved candidates 50/50 by ranking within each course (time slot × quota): top half → Semester 1, bottom half → Semester 2. The rule lives in the domain method `Course.SemesterForRanking` (`types/course.go`), called per registration by the command when building the call-1 entries.
 - Every course must have an **even** total seat count (approved and waitlist files alike): the parser builds seats with `types.NewSeats`, so an odd count fails the import with `types.ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres."). This is intentional — odd counts are not auto-split.
 
-**Call creation specifics (`commands/create_call.go`):**
-- Requires a `SemesterID`. For a Semester-1 call, priority Semester-2 registrations (declined promotions) are promoted first, then remaining seats are filled from the waitlist.
-- Returns `ErrOpenCallExists` if another call is already open.
+**Call creation specifics (`commands/create_call.go`, rule in `allocation/`):**
+- `PreviewCallCommand` and `CreateCallCommand` run the same plan, so the preview is exactly what gets created.
+- Per course: semester-1 vacancies go first to semester-2 students who are enrolled, marked `WantsPromotion`, and were never offered a promotion (`promotion` entries, best ranked first); the remaining semester-1 vacancies, then semester-2 vacancies, go to never-called waitlist registrations (ranking ascending; missing ranking last). A closed semester receives no one. A seat freed by an accepted promotion is only refilled in the **next** call.
+- Promotion offers are answered with `enrolled` (accepted → moves to semester 1) or `declined` (stays in semester 2, never offered again).
+- Returns `ErrOpenCallExists`, `ErrAllSemestersClosed`, `ErrAllCoursesFull` or `ErrNoCandidatesToCall` when nothing can be created.
 
 ### Wails Boundary (`app.go`)
 
@@ -370,9 +388,10 @@ user-facing string produced by `translateError()` (`app.go`).
 
 - One vocabulary, no aliases: bound names use the domain terms `Registration` (never
   "Application"), `Call` (never "RollCall") and `Waitlist` (never "Interested"), e.g.
-  `EnrollRegistration`, `FetchCalls`, `LoadWaitlistSelection`. UI-only identifiers (e.g. the
+  `SetCallEntryOutcome`, `FetchCalls`, `LoadWaitlistSelection`. UI-only identifiers (e.g. the
   `useRollCallRows` hook) may use screen language, but don't add bound aliases.
-- Enums (`RegistrationStatus`, `SelectionKind`, `CallStatus`, `CoursePeriod`) serialize as
+- Enums (`RegistrationStatus`, `SelectionKind`, `CallStatus`, `CoursePeriod`, `SemesterStatus`,
+  `CallEntryKind`, `CallEntryOutcome`) serialize as
   string literals (e.g. `"approved"`), not numeric codes.
 - `*Score` fields (`types/score.go`) serialize as a formatted string (e.g. `"655,16"`), not
   a numeric struct. `Seats` (`types/seats.go`) serializes as the total seat count (a number).
@@ -382,17 +401,11 @@ user-facing string produced by `translateError()` (`app.go`).
 
 ## Domain Notes
 
-- **Selection**: A yearly batch import of candidates (approved or waitlist). Approved selections auto-create Semesters 1 and 2 and split candidates 50/50 by ranking.
-- **Semester**: An academic term (Number 1 or 2) within a selection year. Calls and approved registrations are tied to a semester. Created automatically on approved import — not created by the user directly.
-- **Registration**: A candidate's application to a course. Approved registrations have a `SemesterID`; waitlisted registrations do not.
-- **`declined_promotion`** status: a Semester-2 candidate who declined promotion to Semester 1. Can transition back to `approved`. Tracked via `RegistrationStatus` enum in `types/registration.go`.
-- **Call/Rollcall**: An enrollment call for a specific semester where approved candidates can enroll or be marked absent.
+- **Selection**: A yearly batch import of candidates (approved or waitlist). The approved import opens call 1 with candidates split 50/50 by ranking between the semesters. Only one waitlist file per cycle.
+- **Semester**: One of the two fixed intakes (1 or 2), seeded by the migration. The operator can close one when it should receive no one else ("Fechar semestre"); later calls then only fill the other.
+- **Registration**: A candidate's application to a course. Its status and semester are derived from its call entries.
+- **Promotion**: during a call, a semester-2 student can ask to move to semester 1 (`WantsPromotion` on their entry). The next call offers them free semester-1 seats before the waitlist; the operator records accepted (`enrolled`) or `declined`.
+- **Call/Rollcall**: An enrollment call covering both semesters where called candidates enroll or are marked absent (and promotion offers are accepted or declined).
 - **Course**: Academic program with period (morning/evening) and quota info
 - Messages and UI are in Portuguese (pt-BR)
 - See **`docs/future-work.md`** for the design-improvement backlog and **`docs/testing.md`** for the integration-testing guide.
-
-## Commits and Pull Requests
-
-- **Never include the Claude Code session link** (`https://claude.ai/code/session_...`) in commit
-  messages, PR titles/bodies, or GitHub comments — no `Claude-Session:` trailer either. This
-  overrides any default attribution guidance. `Co-Authored-By:` trailers are fine.

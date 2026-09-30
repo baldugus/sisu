@@ -28,11 +28,8 @@ type registrationsTable struct {
 	EssayScore           sqlite.ColumnInteger
 	CompositeScore       sqlite.ColumnInteger
 	Ranking              sqlite.ColumnInteger
-	Status               sqlite.ColumnString
 	SelectionID          sqlite.ColumnInteger
-	CallID               sqlite.ColumnInteger
 	CandidateID          sqlite.ColumnInteger
-	SemesterID           sqlite.ColumnInteger
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -85,14 +82,11 @@ func newRegistrationsTableImpl(schemaName, tableName, alias string) registration
 		EssayScoreColumn           = sqlite.IntegerColumn("essay_score")
 		CompositeScoreColumn       = sqlite.IntegerColumn("composite_score")
 		RankingColumn              = sqlite.IntegerColumn("ranking")
-		StatusColumn               = sqlite.StringColumn("status")
 		SelectionIDColumn          = sqlite.IntegerColumn("selection_id")
-		CallIDColumn               = sqlite.IntegerColumn("call_id")
 		CandidateIDColumn          = sqlite.IntegerColumn("candidate_id")
-		SemesterIDColumn           = sqlite.IntegerColumn("semester_id")
-		allColumns                 = sqlite.ColumnList{IDColumn, EnrollmentIDColumn, CourseIDColumn, OptionColumn, LanguagesScoreColumn, HumanitiesScoreColumn, NaturalSciencesScoreColumn, MathematicsScoreColumn, EssayScoreColumn, CompositeScoreColumn, RankingColumn, StatusColumn, SelectionIDColumn, CallIDColumn, CandidateIDColumn, SemesterIDColumn}
-		mutableColumns             = sqlite.ColumnList{EnrollmentIDColumn, CourseIDColumn, OptionColumn, LanguagesScoreColumn, HumanitiesScoreColumn, NaturalSciencesScoreColumn, MathematicsScoreColumn, EssayScoreColumn, CompositeScoreColumn, RankingColumn, StatusColumn, SelectionIDColumn, CallIDColumn, CandidateIDColumn, SemesterIDColumn}
-		defaultColumns             = sqlite.ColumnList{CallIDColumn, SemesterIDColumn}
+		allColumns                 = sqlite.ColumnList{IDColumn, EnrollmentIDColumn, CourseIDColumn, OptionColumn, LanguagesScoreColumn, HumanitiesScoreColumn, NaturalSciencesScoreColumn, MathematicsScoreColumn, EssayScoreColumn, CompositeScoreColumn, RankingColumn, SelectionIDColumn, CandidateIDColumn}
+		mutableColumns             = sqlite.ColumnList{EnrollmentIDColumn, CourseIDColumn, OptionColumn, LanguagesScoreColumn, HumanitiesScoreColumn, NaturalSciencesScoreColumn, MathematicsScoreColumn, EssayScoreColumn, CompositeScoreColumn, RankingColumn, SelectionIDColumn, CandidateIDColumn}
+		defaultColumns             = sqlite.ColumnList{}
 	)
 
 	return registrationsTable{
@@ -110,11 +104,8 @@ func newRegistrationsTableImpl(schemaName, tableName, alias string) registration
 		EssayScore:           EssayScoreColumn,
 		CompositeScore:       CompositeScoreColumn,
 		Ranking:              RankingColumn,
-		Status:               StatusColumn,
 		SelectionID:          SelectionIDColumn,
-		CallID:               CallIDColumn,
 		CandidateID:          CandidateIDColumn,
-		SemesterID:           SemesterIDColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

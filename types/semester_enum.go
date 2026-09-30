@@ -11,39 +11,29 @@ import (
 )
 
 const (
-	// SemesterStatusOpen is a SemesterStatus of type Open.
-	SemesterStatusOpen SemesterStatus = iota
-	// SemesterStatusClosed is a SemesterStatus of type Closed.
-	SemesterStatusClosed
+	// SemesterStatusOpen is a SemesterStatus of type open.
+	SemesterStatusOpen SemesterStatus = "open"
+	// SemesterStatusClosed is a SemesterStatus of type closed.
+	SemesterStatusClosed SemesterStatus = "closed"
 )
 
 var ErrInvalidSemesterStatus = errors.New("not a valid SemesterStatus")
 
-const _SemesterStatusName = "openclosed"
-
-var _SemesterStatusMap = map[SemesterStatus]string{
-	SemesterStatusOpen:   _SemesterStatusName[0:4],
-	SemesterStatusClosed: _SemesterStatusName[4:10],
-}
-
 // String implements the Stringer interface.
 func (x SemesterStatus) String() string {
-	if str, ok := _SemesterStatusMap[x]; ok {
-		return str
-	}
-	return fmt.Sprintf("SemesterStatus(%d)", x)
+	return string(x)
 }
 
 // IsValid provides a quick way to determine if the typed value is
 // part of the allowed enumerated values
 func (x SemesterStatus) IsValid() bool {
-	_, ok := _SemesterStatusMap[x]
-	return ok
+	_, err := ParseSemesterStatus(string(x))
+	return err == nil
 }
 
 var _SemesterStatusValue = map[string]SemesterStatus{
-	_SemesterStatusName[0:4]:  SemesterStatusOpen,
-	_SemesterStatusName[4:10]: SemesterStatusClosed,
+	"open":   SemesterStatusOpen,
+	"closed": SemesterStatusClosed,
 }
 
 // ParseSemesterStatus attempts to convert a string to a SemesterStatus.
@@ -51,29 +41,5 @@ func ParseSemesterStatus(name string) (SemesterStatus, error) {
 	if x, ok := _SemesterStatusValue[name]; ok {
 		return x, nil
 	}
-	return SemesterStatus(0), fmt.Errorf("%s is %w", name, ErrInvalidSemesterStatus)
-}
-
-// MarshalText implements the text marshaller method.
-func (x SemesterStatus) MarshalText() ([]byte, error) {
-	return []byte(x.String()), nil
-}
-
-// UnmarshalText implements the text unmarshaller method.
-func (x *SemesterStatus) UnmarshalText(text []byte) error {
-	name := string(text)
-	tmp, err := ParseSemesterStatus(name)
-	if err != nil {
-		return err
-	}
-	*x = tmp
-	return nil
-}
-
-// AppendText appends the textual representation of itself to the end of b
-// (allocating a larger slice if necessary) and returns the updated slice.
-//
-// Implementations must not retain b, nor mutate any bytes within b[:len(b)].
-func (x *SemesterStatus) AppendText(b []byte) ([]byte, error) {
-	return append(b, x.String()...), nil
+	return SemesterStatus(""), fmt.Errorf("%s is %w", name, ErrInvalidSemesterStatus)
 }

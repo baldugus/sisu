@@ -8,12 +8,19 @@ import (
 	"github.com/baldugus/sisu/types"
 )
 
+// CreateTeacherPDFCommand lists the students currently enrolled in one
+// semester and time slot.
 type CreateTeacherPDFCommand struct {
 	Period   types.CoursePeriod
+	Semester int32
 	FilePath string
 }
 
 func (cmd *CreateTeacherPDFCommand) Execute(db *database.Database) error {
+	if cmd.Semester != 1 && cmd.Semester != 2 {
+		return ErrInvalidSemester{}
+	}
+
 	selection, err := db.FetchSelection(types.SelectionKindApproved)
 	if err != nil {
 		return fmt.Errorf("fetch selection: %w", err)
@@ -26,18 +33,14 @@ func (cmd *CreateTeacherPDFCommand) Execute(db *database.Database) error {
 
 	var courseInfos []*pdfbuilder.CourseInfo
 	for _, course := range courses {
-		registrations, err := db.FetchEnrolledRegistrationsByCourseID(course.ID)
+		registrations, err := db.FetchEnrolledRegistrationsByCourseAndSemester(course.ID, cmd.Semester)
 		if err != nil {
 			return fmt.Errorf("fetch registrations for course %d: %w", course.ID, err)
 		}
 		courseInfos = append(courseInfos, pdfbuilder.NewCourseInfo(course.Quota, registrations))
 	}
 
-	var semesterNumber int32 = 1
-	// The teacher list doesn't depend on a single call, so we default to 1
-	// Ideally this could be passed as a parameter or fetched from the first registration
-
-	selectionInfo := pdfbuilder.NewSelectionInfo(selection, semesterNumber, 0)
+	selectionInfo := pdfbuilder.NewSelectionInfo(selection, cmd.Semester, 0)
 
 	builder := &pdfbuilder.Builder{
 		Period:    coursePeriodToPortuguese(cmd.Period),

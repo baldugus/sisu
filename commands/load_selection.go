@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -43,54 +41,25 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 	}
 
 	err = db.RunInTx(func(tx qrm.DB) error {
-		var sem1ID, sem2ID int32
-		if cmd.Kind == types.SelectionKindApproved {
-			sem1, err := database.FetchSemesterByYearAndNumber(tx, cmd.Year, 1)
-			if err != nil {
-				if errors.Is(err, qrm.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
-					sem1ID, err = database.CreateSemester(tx, cmd.Year, 1)
-					if err != nil {
-						return err
-					}
-				} else {
-					return err
-				}
-			} else {
-				sem1ID = sem1.ID
-			}
-
-			sem2, err := database.FetchSemesterByYearAndNumber(tx, cmd.Year, 2)
-			if err != nil {
-				if errors.Is(err, qrm.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
-					sem2ID, err = database.CreateSemester(tx, cmd.Year, 2)
-					if err != nil {
-						return err
-					}
-				} else {
-					return err
-				}
-			} else {
-				sem2ID = sem2.ID
-			}
-		}
-
 		selectionID, err := database.CreateSelection(tx, parsed.Selection)
 		if err != nil {
 			return err
 		}
 
-		var callID *int32
+		// The approved import opens call 1 with every approved student, already
+		// split between the two semesters by the parser.
+		var callID int32
 		if cmd.Kind == types.SelectionKindApproved {
-			id, err := database.CreateCall(tx, &types.Call{
-				Number:     1,
-				Status:     types.CallStatusCalling,
-				SemesterID: sem1ID,
+			callID, err = database.CreateCall(tx, &types.Call{
+				Number: 1,
+				Status: types.CallStatusCalling,
 			})
 			if err != nil {
 				return err
 			}
-			callID = &id
 		}
+
+		var entries []*types.CallEntry
 
 		for _, parsedReg := range parsed.Registrations {
 			quotaID, err := database.CreateQuota(tx, parsedReg.Course.Quota)
@@ -108,30 +77,28 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 				return err
 			}
 
-			var mappedSemesterID *int32
-			if cmd.Kind == types.SelectionKindApproved {
-				switch parsedReg.Course.SemesterForRanking(parsedReg.Registration.Ranking) {
-				case 1:
-					mappedSemesterID = &sem1ID
-				case 2:
-					mappedSemesterID = &sem2ID
-				}
-			}
-
-			err = database.CreateRegistration(tx, &database.CreateRegistrationArgs{
+			registrationID, err := database.CreateRegistration(tx, &database.CreateRegistrationArgs{
 				Registration: parsedReg.Registration,
 				CandidateID:  candidateID,
 				CourseID:     courseID,
 				SelectionID:  selectionID,
-				CallID:       callID,
-				SemesterID:   mappedSemesterID,
 			})
 			if err != nil {
 				return err
 			}
+
+			if cmd.Kind == types.SelectionKindApproved {
+				entries = append(entries, &types.CallEntry{
+					CallID:         callID,
+					RegistrationID: registrationID,
+					Kind:           types.CallEntryKindInitial,
+					Semester:       parsedReg.Course.SemesterForRanking(parsedReg.Registration.Ranking),
+					Outcome:        types.CallEntryOutcomePending,
+				})
+			}
 		}
 
-		return nil
+		return database.CreateCallEntries(tx, entries)
 	})
 	if err != nil {
 		return fmt.Errorf("create selection: %w", err)

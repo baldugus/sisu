@@ -8,8 +8,7 @@
 package model
 
 type Calls struct {
-	ID         int32 `sql:"primary_key"`
-	Number     int32
-	Status     string
-	SemesterID int32
+	ID     int32 `sql:"primary_key"`
+	Number int32
+	Status string
 }

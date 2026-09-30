@@ -100,13 +100,23 @@ are the canonical shadcn pages. Page shell + header:
 
 - **Selection** — yearly batch: `ID, Name, Kind ("approved"|"waitlist"), Year, Institution, Degree`.
 - **Registration** — an application: `ID, EnrollmentID, Option, *Score fields (formatted strings, e.g. "655,16"),
-  Ranking, Status, Candidate, SemesterID (*int32)`.
-  `Status` values: `approved | waitlisted | absent | enrolled | declined_promotion`.
-- **RegistrationDetail** — `{ Registration, Course, Call }`.
+  Ranking, Status, Candidate, Semester (number | undefined)`.
+  `Status` (derived from call entries) values: `approved | waitlisted | absent | enrolled`;
+  `Semester` is the semester the registration currently holds a seat in.
+- **RegistrationDetail** — `{ Registration, Course, History: CallEntry[] }` (oldest call first).
 - **Candidate** — `ID, CPF, Name, SocialName, BirthDate, Sex, MotherName, AddressLine,
   AddressLine2, HouseNumber, Neighborhood, Municipality, State, CEP, Email, Phone1, Phone2`.
 - **Course** — `ID, Seats, MinimumScore, Period ("morning"|"evening"), Quota`.
-- **Call** — enrollment call: `Status, Number, SemesterID`.
+- **CallSummary** (`FetchCalls`) — `ID, Number, Status ("calling"|"done"), Pending, Semesters[]`
+  with per-semester counts of `Initial`, `Waitlist`, `Promotion` entries.
+- **CallEntry** — a registration in a call: `CallID, CallNumber, RegistrationID, Kind
+  ("initial"|"waitlist"|"promotion"), Semester, Outcome ("pending"|"enrolled"|"absent"|"declined"),
+  WantsPromotion`. `FetchCallEntries(callID)` returns `CallEntryDetail { Entry, Registration, Course }`.
+  Change outcomes with `SetCallEntryOutcome(callID, registrationID, outcome)` and promotion
+  requests with `SetWantsPromotion(callID, registrationID, bool)`; `src/lib/status.ts` maps
+  outcomes to the status badges.
+- **Semester** — `Number, Status ("open"|"closed"), ClosedAfterCall?, Seats, Occupied`; always two.
+- **CallPlan** (`PreviewCall`) — who the next call would summon, per course; `CreateCall()` applies it.
 
 ## Conventions
 

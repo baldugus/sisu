@@ -3,6 +3,7 @@ package database
 import (
 	"github.com/baldugus/sisu/database/.gen/model"
 	. "github.com/baldugus/sisu/database/.gen/table"
+	"github.com/baldugus/sisu/database/.gen/view"
 	"github.com/baldugus/sisu/types"
 	"github.com/go-jet/jet/v2/qrm"
 	. "github.com/go-jet/jet/v2/sqlite"
@@ -13,202 +14,110 @@ type CreateRegistrationArgs struct {
 	CandidateID  int32
 	CourseID     int32
 	SelectionID  int32
-	CallID       *int32
-	SemesterID   *int32
 }
 
-func CreateRegistration(db qrm.DB, args *CreateRegistrationArgs) error {
+func CreateRegistration(db qrm.DB, args *CreateRegistrationArgs) (int32, error) {
 	registrationModel := toRegistrationModel(args.Registration)
 	registrationModel.CandidateID = args.CandidateID
 	registrationModel.CourseID = args.CourseID
 	registrationModel.SelectionID = args.SelectionID
-	registrationModel.CallID = args.CallID
-	registrationModel.SemesterID = args.SemesterID
 
 	stmt := Registrations.INSERT(Registrations.MutableColumns).
 		MODEL(registrationModel).
 		RETURNING(Registrations.ID)
 
-	_, err := insertOne[model.Registrations](db, stmt)
+	result, err := insertOne[model.Registrations](db, stmt)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return result.ID, nil
+}
+
+// registrationsWithPlacement is the FROM clause shared by every registration
+// query: the registration, its candidate and its derived placement.
+func registrationsWithPlacement() ReadableTable {
+	return Registrations.
+		INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)).
+		LEFT_JOIN(view.RegistrationPlacements, view.RegistrationPlacements.RegistrationID.EQ(Registrations.ID))
+}
+
+func fetchRegistrations(db qrm.DB, where BoolExpression) ([]*types.Registration, error) {
+	stmt := SELECT(
+		Registrations.AllColumns,
+		Candidates.AllColumns,
+		view.RegistrationPlacements.AllColumns,
+	).FROM(
+		registrationsWithPlacement(),
+	).WHERE(
+		where,
+	).ORDER_BY(
+		Registrations.ID.ASC(),
+	)
+
+	var result registrationsResult
+
+	err := stmt.Query(db, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.toRegistrationsDomain(), nil
 }
 
 func (d *Database) FetchRegistrations() ([]*types.Registration, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)),
-	)
-
-	var result registrationsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toRegistrationsDomain(), nil
+	return fetchRegistrations(d.db, Bool(true))
 }
 
 func (d *Database) FetchRegistrationsBySelectionID(selectionID int32) ([]*types.Registration, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)),
-	).WHERE(
-		Registrations.SelectionID.EQ(Int32(selectionID)),
-	)
-
-	var result registrationsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toRegistrationsDomain(), nil
+	return fetchRegistrations(d.db, Registrations.SelectionID.EQ(Int32(selectionID)))
 }
 
 func (d *Database) FetchRegistrationsByCourseID(courseID int32) ([]*types.Registration, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)),
-	).WHERE(
-		Registrations.CourseID.EQ(Int32(courseID)),
-	)
-
-	var result registrationsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toRegistrationsDomain(), nil
+	return fetchRegistrations(d.db, Registrations.CourseID.EQ(Int32(courseID)))
 }
 
-func (d *Database) FetchRegistrationsByCallID(callID int32) ([]*types.Registration, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)),
-	).WHERE(
-		Registrations.CallID.EQ(Int32(callID)),
-	)
-
-	var result registrationsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toRegistrationsDomain(), nil
-}
-
-func (d *Database) FetchRegistrationsByCallIDAndCourseID(callID, courseID int32) ([]*types.Registration, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)),
-	).WHERE(
-		Registrations.CallID.EQ(Int32(callID)).
-			AND(Registrations.CourseID.EQ(Int32(courseID))),
-	)
-
-	var result registrationsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toRegistrationsDomain(), nil
-}
-
-func (d *Database) FetchEnrolledRegistrationsByCourseID(courseID int32) ([]*types.Registration, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)),
-	).WHERE(
-		Registrations.CourseID.EQ(Int32(courseID)).
-			AND(Registrations.Status.EQ(String(types.RegistrationStatusEnrolled.String()))),
-	)
-
-	var result registrationsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toRegistrationsDomain(), nil
-}
-
-func (d *Database) FetchEnrolledRegistrationsByCourseIDs(courseIDs []int32) ([]*types.Registration, error) {
-	if len(courseIDs) == 0 {
+// FetchRegistrationsByIDs returns the given registrations (any order).
+func FetchRegistrationsByIDs(db qrm.DB, ids []int32) ([]*types.Registration, error) {
+	if len(ids) == 0 {
 		return []*types.Registration{}, nil
 	}
 
-	courseIDExprs := make([]Expression, len(courseIDs))
-	for i, id := range courseIDs {
-		courseIDExprs[i] = Int32(id)
-	}
+	return fetchRegistrations(db, Registrations.ID.IN(int32Exprs(ids)...))
+}
 
-	stmt := SELECT(
+// FetchEnrolledRegistrationsByCourseAndSemester returns the students currently
+// enrolled in a course for one semester.
+func (d *Database) FetchEnrolledRegistrationsByCourseAndSemester(
+	courseID int32,
+	semester int32,
+) ([]*types.Registration, error) {
+	return fetchRegistrations(d.db,
+		Registrations.CourseID.EQ(Int32(courseID)).
+			AND(view.RegistrationPlacements.Outcome.EQ(String(types.CallEntryOutcomeEnrolled.String()))).
+			AND(view.RegistrationPlacements.Semester.EQ(Int32(semester))),
+	)
+}
+
+func fullRegistrationSelect() SelectStatement {
+	return SELECT(
 		Registrations.AllColumns,
 		Candidates.AllColumns,
+		view.RegistrationPlacements.AllColumns,
+		Courses.AllColumns,
+		Quotas.AllColumns,
 	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)),
-	).WHERE(
-		Registrations.CourseID.IN(courseIDExprs...).
-			AND(Registrations.Status.EQ(String(types.RegistrationStatusEnrolled.String()))),
+		registrationsWithPlacement().
+			INNER_JOIN(Courses, Courses.ID.EQ(Registrations.CourseID)).
+			INNER_JOIN(Quotas, Quotas.ID.EQ(Courses.QuotaID)),
 	)
-
-	var result registrationsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toRegistrationsDomain(), nil
 }
 
 func (d *Database) FetchEnrolledRegistrationDetails() ([]*types.RegistrationDetail, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-		Courses.AllColumns,
-		Quotas.AllColumns,
-		Calls.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)).
-			INNER_JOIN(Courses, Courses.ID.EQ(Registrations.CourseID)).
-			INNER_JOIN(Quotas, Quotas.ID.EQ(Courses.QuotaID)).
-			LEFT_JOIN(Calls, Calls.ID.EQ(Registrations.CallID)),
-	).WHERE(
-		Registrations.Status.EQ(String(types.RegistrationStatusEnrolled.String())),
+	stmt := fullRegistrationSelect().WHERE(
+		view.RegistrationPlacements.Outcome.EQ(String(types.CallEntryOutcomeEnrolled.String())),
+	).ORDER_BY(
+		Registrations.ID.ASC(),
 	)
 
 	var result fullRegistrationsResult
@@ -221,31 +130,34 @@ func (d *Database) FetchEnrolledRegistrationDetails() ([]*types.RegistrationDeta
 	return result.toRegistrationDetails()
 }
 
-func (d *Database) FetchRegistrationByID(registrationID int32) (*types.RegistrationDetail, error) {
-	stmt := SELECT(
-		Registrations.AllColumns,
-		Candidates.AllColumns,
-		Courses.AllColumns,
-		Quotas.AllColumns,
-		Calls.AllColumns,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Candidates, Candidates.ID.EQ(Registrations.CandidateID)).
-			INNER_JOIN(Courses, Courses.ID.EQ(Registrations.CourseID)).
-			INNER_JOIN(Quotas, Quotas.ID.EQ(Courses.QuotaID)).
-			LEFT_JOIN(Calls, Calls.ID.EQ(Registrations.CallID)),
-	).WHERE(
+// FetchRegistrationByID returns a registration with its course and full call history.
+func FetchRegistrationByID(db qrm.DB, registrationID int32) (*types.RegistrationDetail, error) {
+	stmt := fullRegistrationSelect().WHERE(
 		Registrations.ID.EQ(Int32(registrationID)),
 	)
 
 	var result fullRegistrationResult
 
-	err := stmt.Query(d.db, &result)
+	err := stmt.Query(db, &result)
 	if err != nil {
 		return nil, err
 	}
 
-	return result.toRegistrationDetail()
+	detail, err := result.toRegistrationDetail()
+	if err != nil {
+		return nil, err
+	}
+
+	detail.History, err = FetchRegistrationHistory(db, registrationID)
+	if err != nil {
+		return nil, err
+	}
+
+	return detail, nil
+}
+
+func (d *Database) FetchRegistrationByID(registrationID int32) (*types.RegistrationDetail, error) {
+	return FetchRegistrationByID(d.db, registrationID)
 }
 
 func (d *Database) FetchSelectionKindByRegistrationID(registrationID int32) (types.SelectionKind, error) {
@@ -268,111 +180,6 @@ func (d *Database) FetchSelectionKindByRegistrationID(registrationID int32) (typ
 	}
 
 	return types.ParseSelectionKind(result.Kind)
-}
-
-func CountCourseOccupiedSeats(db qrm.DB, courseID int32) (int32, error) {
-	stmt := SELECT(
-		COUNT(Registrations.ID).AS("count"),
-	).FROM(
-		Registrations,
-	).WHERE(
-		Registrations.CourseID.EQ(Int32(courseID)).
-			AND(Registrations.Status.IN(
-				String(types.RegistrationStatusApproved.String()),
-				String(types.RegistrationStatusEnrolled.String()),
-			)),
-	)
-
-	var result struct {
-		Count int32
-	}
-
-	err := stmt.Query(db, &result)
-	if err != nil {
-		return 0, err
-	}
-
-	return result.Count, nil
-}
-
-func (d *Database) UpdateRegistrationStatus(registrationID int32, status types.RegistrationStatus) error {
-	stmt := Registrations.UPDATE().
-		SET(
-			Registrations.Status.SET(String(status.String())),
-		).
-		WHERE(Registrations.ID.EQ(Int32(registrationID)))
-
-	_, err := stmt.Exec(d.db)
-	return err
-}
-
-func FetchWaitlistedRegistrationsByCourse(db qrm.DB, courseID int32, limit int32) ([]int32, error) {
-	stmt := SELECT(
-		Registrations.ID,
-	).FROM(
-		Registrations,
-	).WHERE(
-		Registrations.CourseID.EQ(Int32(courseID)).
-			AND(Registrations.Status.EQ(String(types.RegistrationStatusWaitlisted.String()))),
-	).ORDER_BY(
-		Registrations.Ranking.DESC(),
-	).LIMIT(int64(limit))
-
-	var result []int32
-
-	err := stmt.Query(db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func FetchPriorityRegistrationsByCourse(db qrm.DB, courseID int32, semesterID int32, limit int32) ([]int32, error) {
-	stmt := SELECT(
-		Registrations.ID,
-	).FROM(
-		Registrations,
-	).WHERE(
-		Registrations.CourseID.EQ(Int32(courseID)).
-			AND(Registrations.Status.EQ(String(types.RegistrationStatusApproved.String()))).
-			AND(Registrations.SemesterID.EQ(Int32(semesterID))),
-	).ORDER_BY(
-		Registrations.Ranking.ASC(),
-	).LIMIT(int64(limit))
-
-	var result []int32
-
-	err := stmt.Query(db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func AssignRegistrationToCall(db qrm.DB, registrationID int32, callID int32) error {
-	stmt := Registrations.UPDATE().
-		SET(
-			Registrations.Status.SET(String(types.RegistrationStatusApproved.String())),
-			Registrations.CallID.SET(Int32(callID)),
-		).
-		WHERE(Registrations.ID.EQ(Int32(registrationID)))
-
-	_, err := stmt.Exec(db)
-	return err
-}
-
-func RevertRegistrationsToWaitlisted(db qrm.DB, callID int32) error {
-	stmt := Registrations.UPDATE().
-		SET(
-			Registrations.Status.SET(String(types.RegistrationStatusWaitlisted.String())),
-			Registrations.CallID.SET(CAST(Raw("NULL")).AS_INTEGER()),
-		).
-		WHERE(Registrations.CallID.EQ(Int32(callID)))
-
-	_, err := stmt.Exec(db)
-	return err
 }
 
 func DeleteAllRegistrations(db qrm.DB) error {
@@ -399,4 +206,13 @@ func FetchCandidateIDsBySelectionID(db qrm.DB, selectionID int32) ([]int32, erro
 	}
 
 	return candidateIDs, nil
+}
+
+func int32Exprs(values []int32) []Expression {
+	exprs := make([]Expression, len(values))
+	for i, v := range values {
+		exprs[i] = Int32(v)
+	}
+
+	return exprs
 }

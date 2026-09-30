@@ -2,7 +2,8 @@ export type StatusValue =
   | 'APPROVED'
   | 'ABSENT'
   | 'ENROLLED'
-  | 'WAITLISTED';
+  | 'WAITLISTED'
+  | 'DECLINED';
 
 export interface StatusDef {
   value: StatusValue;
@@ -41,6 +42,14 @@ export const STATUSES: StatusDef[] = [
     textColor: 'text-[#0D3B6B]',
     badgeBg: 'bg-[#EEF5FF]',
   },
+  {
+    // Only for promotion offers: the student stays in semester 2.
+    value: 'DECLINED',
+    label: 'Recusou',
+    color: 'bg-[#7C6FB0]',
+    textColor: 'text-[#3A2F6B]',
+    badgeBg: 'bg-[#F3F0FF]',
+  },
 ];
 
 export const STATUS_MAP = Object.fromEntries(
@@ -50,4 +59,57 @@ export const STATUS_MAP = Object.fromEntries(
 export function getStatus(raw: string): StatusDef {
   const key = raw?.toUpperCase() as StatusValue;
   return STATUS_MAP[key] ?? STATUS_MAP['APPROVED'];
+}
+
+// ── Call entries ────────────────────────────────────────────────────────────
+// A call entry's outcome ("pending" | "enrolled" | "absent" | "declined") maps
+// onto the same badges as a registration's status.
+
+export type EntryKind = 'initial' | 'waitlist' | 'promotion';
+
+const OUTCOME_TO_STATUS: Record<string, StatusValue> = {
+  pending: 'APPROVED',
+  enrolled: 'ENROLLED',
+  absent: 'ABSENT',
+  declined: 'DECLINED',
+};
+
+const STATUS_TO_OUTCOME: Record<StatusValue, string | undefined> = {
+  APPROVED: 'pending',
+  ENROLLED: 'enrolled',
+  ABSENT: 'absent',
+  DECLINED: 'declined',
+  WAITLISTED: undefined,
+};
+
+export function outcomeToStatus(outcome: string): StatusValue {
+  return OUTCOME_TO_STATUS[outcome] ?? 'APPROVED';
+}
+
+export function statusToOutcome(status: string): string | undefined {
+  return STATUS_TO_OUTCOME[status as StatusValue];
+}
+
+/** Outcomes the operator can set, per entry kind. */
+export function statusesForKind(kind?: string): StatusDef[] {
+  const allowed: StatusValue[] =
+    kind === 'promotion' ? ['APPROVED', 'ENROLLED', 'DECLINED'] : ['APPROVED', 'ENROLLED', 'ABSENT'];
+  return allowed.map((v) => statusLabelForKind(v, kind));
+}
+
+/** Promotion offers read as accepted/declined rather than enrolled. */
+export function statusLabelForKind(value: StatusValue, kind?: string): StatusDef {
+  const def = STATUS_MAP[value];
+  if (kind === 'promotion' && value === 'ENROLLED') return { ...def, label: 'Aceitou' };
+  return def;
+}
+
+export const KIND_LABELS: Record<EntryKind, string> = {
+  initial: 'Inicial',
+  waitlist: 'Lista de espera',
+  promotion: 'Promoção',
+};
+
+export function semesterLabel(semester?: number | null): string {
+  return semester ? `${semester}º` : '—';
 }

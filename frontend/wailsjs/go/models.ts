@@ -1,21 +1,47 @@
 export namespace types {
 	
-	export class Call {
-	    ID: number;
-	    Status: string;
-	    Number: number;
-	    SemesterID: number;
+	export class CallEntry {
+	    CallID: number;
+	    CallNumber: number;
+	    RegistrationID: number;
+	    Kind: string;
+	    Semester: number;
+	    Outcome: string;
+	    WantsPromotion: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new Call(source);
+	        return new CallEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.CallID = source["CallID"];
+	        this.CallNumber = source["CallNumber"];
+	        this.RegistrationID = source["RegistrationID"];
+	        this.Kind = source["Kind"];
+	        this.Semester = source["Semester"];
+	        this.Outcome = source["Outcome"];
+	        this.WantsPromotion = source["WantsPromotion"];
+	    }
+	}
+	export class Course {
+	    ID: number;
+	    Seats: number;
+	    MinimumScore?: string;
+	    Period: string;
+	    Quota: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Course(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
-	        this.Status = source["Status"];
-	        this.Number = source["Number"];
-	        this.SemesterID = source["SemesterID"];
+	        this.Seats = source["Seats"];
+	        this.MinimumScore = source["MinimumScore"];
+	        this.Period = source["Period"];
+	        this.Quota = source["Quota"];
 	    }
 	}
 	export class Candidate {
@@ -62,26 +88,6 @@ export namespace types {
 	        this.Phone2 = source["Phone2"];
 	    }
 	}
-	export class Course {
-	    ID: number;
-	    Seats: number;
-	    MinimumScore?: string;
-	    Period: string;
-	    Quota: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Course(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ID = source["ID"];
-	        this.Seats = source["Seats"];
-	        this.MinimumScore = source["MinimumScore"];
-	        this.Period = source["Period"];
-	        this.Quota = source["Quota"];
-	    }
-	}
 	export class Registration {
 	    ID: number;
 	    EnrollmentID: string;
@@ -95,7 +101,7 @@ export namespace types {
 	    Ranking: number;
 	    Status: string;
 	    Candidate?: Candidate;
-	    SemesterID?: number;
+	    Semester?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Registration(source);
@@ -115,7 +121,7 @@ export namespace types {
 	        this.Ranking = source["Ranking"];
 	        this.Status = source["Status"];
 	        this.Candidate = this.convertValues(source["Candidate"], Candidate);
-	        this.SemesterID = source["SemesterID"];
+	        this.Semester = source["Semester"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -136,10 +142,204 @@ export namespace types {
 		    return a;
 		}
 	}
+	export class CallEntryDetail {
+	    Entry?: CallEntry;
+	    Registration?: Registration;
+	    Course?: Course;
+	
+	    static createFrom(source: any = {}) {
+	        return new CallEntryDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Entry = this.convertValues(source["Entry"], CallEntry);
+	        this.Registration = this.convertValues(source["Registration"], Registration);
+	        this.Course = this.convertValues(source["Course"], Course);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CoursePlan {
+	    Course?: Course;
+	    Vacancies1: number;
+	    Vacancies2: number;
+	    Promoted: Registration[];
+	    Waitlist1: Registration[];
+	    Waitlist2: Registration[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CoursePlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Course = this.convertValues(source["Course"], Course);
+	        this.Vacancies1 = source["Vacancies1"];
+	        this.Vacancies2 = source["Vacancies2"];
+	        this.Promoted = this.convertValues(source["Promoted"], Registration);
+	        this.Waitlist1 = this.convertValues(source["Waitlist1"], Registration);
+	        this.Waitlist2 = this.convertValues(source["Waitlist2"], Registration);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Semester {
+	    Number: number;
+	    Status: string;
+	    ClosedAfterCall?: number;
+	    Seats: number;
+	    Occupied: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Semester(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Number = source["Number"];
+	        this.Status = source["Status"];
+	        this.ClosedAfterCall = source["ClosedAfterCall"];
+	        this.Seats = source["Seats"];
+	        this.Occupied = source["Occupied"];
+	    }
+	}
+	export class CallPlan {
+	    Number: number;
+	    Semesters: Semester[];
+	    Courses: CoursePlan[];
+	    Promoted: number;
+	    Waitlist1: number;
+	    Waitlist2: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CallPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Number = source["Number"];
+	        this.Semesters = this.convertValues(source["Semesters"], Semester);
+	        this.Courses = this.convertValues(source["Courses"], CoursePlan);
+	        this.Promoted = source["Promoted"];
+	        this.Waitlist1 = source["Waitlist1"];
+	        this.Waitlist2 = source["Waitlist2"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CallSemesterSummary {
+	    Semester: number;
+	    Initial: number;
+	    Waitlist: number;
+	    Promotion: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CallSemesterSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Semester = source["Semester"];
+	        this.Initial = source["Initial"];
+	        this.Waitlist = source["Waitlist"];
+	        this.Promotion = source["Promotion"];
+	    }
+	}
+	export class CallSummary {
+	    ID: number;
+	    Status: string;
+	    Number: number;
+	    Pending: number;
+	    Semesters: CallSemesterSummary[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CallSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.Status = source["Status"];
+	        this.Number = source["Number"];
+	        this.Pending = source["Pending"];
+	        this.Semesters = this.convertValues(source["Semesters"], CallSemesterSummary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
 	export class RegistrationDetail {
 	    Registration?: Registration;
 	    Course?: Course;
-	    Call?: Call;
+	    History: CallEntry[];
 	
 	    static createFrom(source: any = {}) {
 	        return new RegistrationDetail(source);
@@ -149,7 +349,7 @@ export namespace types {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Registration = this.convertValues(source["Registration"], Registration);
 	        this.Course = this.convertValues(source["Course"], Course);
-	        this.Call = this.convertValues(source["Call"], Call);
+	        this.History = this.convertValues(source["History"], CallEntry);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -202,24 +402,6 @@ export namespace types {
 	        this.Year = source["Year"];
 	        this.Institution = source["Institution"];
 	        this.Degree = source["Degree"];
-	    }
-	}
-	export class Semester {
-	    ID: number;
-	    Year: number;
-	    Number: number;
-	    Status: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new Semester(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ID = source["ID"];
-	        this.Year = source["Year"];
-	        this.Number = source["Number"];
-	        this.Status = source["Status"];
 	    }
 	}
 

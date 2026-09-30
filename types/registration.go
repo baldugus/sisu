@@ -1,6 +1,10 @@
 package types
 
-// ENUM(approved, waitlisted, absent, enrolled, declined_promotion)
+// RegistrationStatus is derived from the registration's call entries, never
+// stored: waitlisted = never called, approved = called and pending, then
+// enrolled or absent.
+//
+// ENUM(approved, waitlisted, absent, enrolled)
 type RegistrationStatus string
 
 type Registration struct {
@@ -16,7 +20,9 @@ type Registration struct {
 	Ranking              int32              `csv:"CLASSIFICACAO"`
 	Status               RegistrationStatus `csv:"SITUACAO"`
 	Candidate            *Candidate
-	SemesterID           *int32
+	// Semester is the semester the registration currently holds a seat in
+	// (derived; nil when waitlisted or absent).
+	Semester *int32
 }
 
 type Registrations []*Registration
