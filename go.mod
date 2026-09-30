@@ -3,7 +3,7 @@ module github.com/baldugus/sisu
 go 1.26.1
 
 require (
-	github.com/alecthomas/kong v1.15.0
+	github.com/alecthomas/kong v1.16.1
 	github.com/dimchansky/utfbom v1.1.1
 	github.com/gen2brain/go-fitz v1.28.2
 	github.com/go-jet/jet/v2 v2.15.0
