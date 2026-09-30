@@ -5,7 +5,7 @@ This document provides guidelines for AI coding agents working on the SISU codeb
 ## Project Overview
 
 SISU is a full-stack desktop application for managing student admissions from Brazil's SiSU (Sistema de Selecao Unificada). It uses:
-- **Backend**: Go 1.24+ with Wails v2 framework
+- **Backend**: Go 1.26+ with Wails v2 framework
 - **Frontend**: React 18 + TypeScript + Vite — lives in `frontend/` in this same repository (monorepo; formerly the `sisu-frontend` submodule)
 - **Database**: SQLite with go-jet for queries and golang-migrate for migrations
 - **UI**: Tailwind CSS v4 + shadcn/ui (migration off Material Tailwind is complete)
@@ -24,6 +24,9 @@ gofmt -w .
 
 # Go linting (golangci-lint)
 golangci-lint run
+
+# Same lint as CI (golangci-lint v2; config lives in .github/ since the root .golangci.yml is gitignored)
+golangci-lint run --config .github/golangci.yml
 
 # Known nolint directives used: funlen, tagalign, mnd, godox, varnamelen, exhaustruct, lll, wrapcheck
 ```

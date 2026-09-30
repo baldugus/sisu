@@ -1,7 +1,6 @@
 package database
 
 import (
-
 	"github.com/baldugus/sisu/database/.gen/model"
 	. "github.com/baldugus/sisu/database/.gen/table"
 	"github.com/baldugus/sisu/types"

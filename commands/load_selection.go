@@ -110,9 +110,10 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 
 			var mappedSemesterID *int32
 			if parsedReg.Registration.SemesterID != nil {
-				if *parsedReg.Registration.SemesterID == 1 {
+				switch *parsedReg.Registration.SemesterID {
+				case 1:
 					mappedSemesterID = &sem1ID
-				} else if *parsedReg.Registration.SemesterID == 2 {
+				case 2:
 					mappedSemesterID = &sem2ID
 				}
 			}
