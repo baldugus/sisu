@@ -42,14 +42,6 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 		return fmt.Errorf("parsing selection: %w", err)
 	}
 
-	var semesterNumbers map[*types.Registration]int32
-	if cmd.Kind == types.SelectionKindApproved {
-		semesterNumbers, err = approvedSemesterNumbers(parsed.Registrations)
-		if err != nil {
-			return fmt.Errorf("split approved by semester: %w", err)
-		}
-	}
-
 	err = db.RunInTx(func(tx qrm.DB) error {
 		var sem1ID, sem2ID int32
 		if cmd.Kind == types.SelectionKindApproved {
@@ -117,11 +109,18 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 			}
 
 			var mappedSemesterID *int32
-			switch semesterNumbers[parsedReg.Registration] {
-			case 1:
-				mappedSemesterID = &sem1ID
-			case 2:
-				mappedSemesterID = &sem2ID
+			if cmd.Kind == types.SelectionKindApproved {
+				semester, err := parsedReg.Course.SemesterForRanking(parsedReg.Registration.Ranking)
+				if err != nil {
+					return err
+				}
+
+				switch semester {
+				case 1:
+					mappedSemesterID = &sem1ID
+				case 2:
+					mappedSemesterID = &sem2ID
+				}
 			}
 
 			err = database.CreateRegistration(tx, &database.CreateRegistrationArgs{

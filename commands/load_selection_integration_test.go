@@ -131,18 +131,6 @@ func TestLoadSelection_BusinessRules(t *testing.T) {
 			},
 			expectedError: &commands.ErrWaitlistSelectionRequiresApproved{},
 		},
-		{
-			name: "cannot load approved with odd seat count",
-			setup: func(t *testing.T, db *database.Database) {
-				// No setup - empty database
-			},
-			cmd: commands.LoadSelectionCommand{
-				Year:     2025,
-				FilePath: "testdata/approved_odd_seats.csv",
-				Kind:     types.SelectionKindApproved,
-			},
-			expectedError: &commands.ErrOddSeatsCount{},
-		},
 	}
 
 	for _, tt := range tests {
@@ -175,6 +163,28 @@ func TestLoadSelection_TransactionRollback(t *testing.T) {
 	require.Error(t, err, "should fail with invalid CSV")
 
 	// Verify transaction rolled back - no data persisted
+	testutil.AssertDatabaseEmpty(t, db.Database)
+}
+
+func TestLoadApprovedSelection_OddSeatsRollsBack(t *testing.T) {
+	// Arrange
+	db := database.NewTestDatabase(t)
+
+	// approved_odd_seats.csv: evening course has 15 seats.
+	cmd := commands.LoadSelectionCommand{
+		Year:     2025,
+		FilePath: "testdata/approved_odd_seats.csv",
+		Kind:     types.SelectionKindApproved,
+	}
+
+	// Act
+	err := cmd.Execute(db.Database)
+
+	// Assert
+	var oddErr types.ErrOddSeatsCount
+	require.ErrorAs(t, err, &oddErr)
+	assert.Equal(t, int32(15), oddErr.Count)
+
 	testutil.AssertDatabaseEmpty(t, db.Database)
 }
 

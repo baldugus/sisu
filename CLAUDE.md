@@ -353,8 +353,8 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 
 **Approved import specifics (`commands/load_selection.go`):**
 - Automatically finds-or-creates **Semester 1** and **Semester 2** records for the given year.
-- Splits approved candidates 50/50 by ranking: top half → Semester 1, bottom half → Semester 2. The rule lives in the pure function `SplitApprovedBySemester` (`commands/semester_split.go`), applied per course (period + quota); the CSV parser is policy-free and never sets `SemesterID`.
-- The CSV must have an **even** total seat count per course; an odd count returns `commands.ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres."). This is intentional — odd counts are not auto-split.
+- Splits approved candidates 50/50 by ranking: top half → Semester 1, bottom half → Semester 2. The rule lives in the domain method `Course.SemesterForRanking` (`types/course.go`), called per registration by the command; the CSV parser is policy-free and never sets `SemesterID`.
+- The CSV must have an **even** total seat count per course; an odd count returns `types.ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres."). This is intentional — odd counts are not auto-split.
 
 **Call creation specifics (`commands/create_call.go`):**
 - Requires a `SemesterID`. For a Semester-1 call, priority Semester-2 registrations (declined promotions) are promoted first, then remaining seats are filled from the waitlist.

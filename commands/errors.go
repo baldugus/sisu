@@ -1,7 +1,5 @@
 package commands
 
-import "fmt"
-
 type ErrApprovedSelectionAlreadyExists struct{}
 
 func (e ErrApprovedSelectionAlreadyExists) Error() string {
@@ -114,12 +112,4 @@ type ErrCannotDeleteClosedCall struct{}
 
 func (e ErrCannotDeleteClosedCall) Error() string {
 	return "cannot delete a closed call"
-}
-
-type ErrOddSeatsCount struct {
-	Count int32
-}
-
-func (e ErrOddSeatsCount) Error() string {
-	return fmt.Sprintf("total seats must be an even number, got %d", e.Count)
 }
