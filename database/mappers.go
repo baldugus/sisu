@@ -5,6 +5,23 @@ import (
 	"github.com/baldugus/sisu/types"
 )
 
+// derivePlacement turns a registration's current placement (from the
+// registration_placements view) into its status and semester.
+func derivePlacement(p *model.RegistrationPlacements) (types.RegistrationStatus, *int32) {
+	if p == nil || p.Outcome == nil {
+		return types.RegistrationStatusWaitlisted, nil
+	}
+
+	switch types.CallEntryOutcome(*p.Outcome) {
+	case types.CallEntryOutcomePending:
+		return types.RegistrationStatusApproved, p.Semester
+	case types.CallEntryOutcomeEnrolled:
+		return types.RegistrationStatusEnrolled, p.Semester
+	default:
+		return types.RegistrationStatusAbsent, nil
+	}
+}
+
 type selectionResult struct {
 	model.Selections
 }
@@ -37,15 +54,16 @@ type registrationResult struct {
 	model.Registrations
 
 	Candidate model.Candidates
+	Placement *model.RegistrationPlacements
 }
 
 type fullRegistrationResult struct {
 	model.Registrations
 
 	Candidate model.Candidates
+	Placement *model.RegistrationPlacements
 	Course    model.Courses
 	Quota     model.Quotas
-	Call      *model.Calls
 }
 
 type fullRegistrationsResult []fullRegistrationResult
@@ -59,30 +77,22 @@ func (r fullRegistrationsResult) toRegistrationDetails() []*types.RegistrationDe
 }
 
 func (r *fullRegistrationResult) toRegistrationDetail() *types.RegistrationDetail {
-	status, _ := types.ParseRegistrationStatus(r.Status)
-
 	return &types.RegistrationDetail{
-		Registration: &types.Registration{
-			ID:                   r.ID,
-			EnrollmentID:         r.EnrollmentID,
-			Option:               r.Option,
-			LanguagesScore:       &types.Score{Value: r.LanguagesScore},
-			HumanitiesScore:      &types.Score{Value: r.HumanitiesScore},
-			NaturalSciencesScore: &types.Score{Value: r.NaturalSciencesScore},
-			MathematicsScore:     &types.Score{Value: r.MathematicsScore},
-			EssayScore:           &types.Score{Value: r.EssayScore},
-			CompositeScore:       &types.Score{Value: r.CompositeScore},
-			Ranking:              r.Ranking,
-			Status:               status,
-			Candidate:            toCandidateDomain(&r.Candidate),
-		},
-		Course: toCourseDomain(&r.Course, r.Quota.Name),
-		Call:   toCallDomain(r.Call),
+		Registration: toRegistrationDomain(&r.Registrations, &r.Candidate, r.Placement),
+		Course:       toCourseDomain(&r.Course, r.Quota.Name),
 	}
 }
 
 func (r *registrationResult) toRegistrationDomain() *types.Registration {
-	status, _ := types.ParseRegistrationStatus(r.Status)
+	return toRegistrationDomain(&r.Registrations, &r.Candidate, r.Placement)
+}
+
+func toRegistrationDomain(
+	r *model.Registrations,
+	candidate *model.Candidates,
+	placement *model.RegistrationPlacements,
+) *types.Registration {
+	status, semester := derivePlacement(placement)
 
 	return &types.Registration{
 		ID:                   r.ID,
@@ -96,7 +106,8 @@ func (r *registrationResult) toRegistrationDomain() *types.Registration {
 		CompositeScore:       &types.Score{Value: r.CompositeScore},
 		Ranking:              r.Ranking,
 		Status:               status,
-		Candidate:            toCandidateDomain(&r.Candidate),
+		Semester:             semester,
+		Candidate:            toCandidateDomain(candidate),
 	}
 }
 
@@ -130,23 +141,10 @@ func toCallDomain(c *model.Calls) *types.Call {
 	status, _ := types.ParseCallStatus(c.Status)
 
 	return &types.Call{
-		ID:         c.ID,
-		Status:     status,
-		Number:     c.Number,
-		SemesterID: c.SemesterID,
+		ID:     c.ID,
+		Status: status,
+		Number: c.Number,
 	}
-}
-
-type callsResult []*model.Calls
-
-func (c callsResult) toCallsDomain() []*types.Call {
-	calls := make([]*types.Call, len(c))
-
-	for i, call := range c {
-		calls[i] = toCallDomain(call)
-	}
-
-	return calls
 }
 
 func toCandidateModel(candidate *types.Candidate) *model.Candidates {
@@ -172,9 +170,8 @@ func toCandidateModel(candidate *types.Candidate) *model.Candidates {
 
 func toCallModel(call *types.Call) *model.Calls {
 	return &model.Calls{
-		Status:     call.Status.String(),
-		Number:     call.Number,
-		SemesterID: call.SemesterID,
+		Status: call.Status.String(),
+		Number: call.Number,
 	}
 }
 
@@ -220,6 +217,33 @@ func toRegistrationModel(registration *types.Registration) *model.Registrations 
 		EssayScore:           registration.EssayScore.Value,
 		CompositeScore:       registration.CompositeScore.Value,
 		Ranking:              registration.Ranking,
-		Status:               registration.Status.String(),
+	}
+}
+
+func toCallEntryDomain(e *model.CallEntries, callNumber int32) *types.CallEntry {
+	return &types.CallEntry{
+		CallID:         e.CallID,
+		CallNumber:     callNumber,
+		RegistrationID: e.RegistrationID,
+		Kind:           types.CallEntryKind(e.Kind),
+		Semester:       e.Semester,
+		Outcome:        types.CallEntryOutcome(e.Outcome),
+		WantsPromotion: e.WantsPromotion != 0,
+	}
+}
+
+func toCallEntryModel(e *types.CallEntry) *model.CallEntries {
+	var wants int32
+	if e.WantsPromotion {
+		wants = 1
+	}
+
+	return &model.CallEntries{
+		CallID:         e.CallID,
+		RegistrationID: e.RegistrationID,
+		Kind:           e.Kind.String(),
+		Semester:       e.Semester,
+		Outcome:        e.Outcome.String(),
+		WantsPromotion: wants,
 	}
 }

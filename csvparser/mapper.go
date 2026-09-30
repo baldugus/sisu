@@ -175,13 +175,13 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "Ranking", Err: err}
 	}
 
-	var semesterID *int32
+	var semester *int32
 	if status == types.RegistrationStatusApproved {
 		sem := int32(2)
 		if ranking <= int(seats)/2 {
 			sem = 1
 		}
-		semesterID = &sem
+		semester = &sem
 	}
 
 	var call *types.Call
@@ -201,7 +201,7 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 			EssayScore:           essayScore,
 			CompositeScore:       compositeScore,
 			Ranking:              int32(ranking),
-			SemesterID:           semesterID,
+			Semester:             semester,
 			Candidate: &types.Candidate{
 				CPF:          a.CPF,
 				Name:         a.Name,

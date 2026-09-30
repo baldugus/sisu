@@ -43,17 +43,24 @@ func (c coursesResult) toCoursesDomain() []*types.Course {
 }
 
 func (d *Database) FetchCourses() ([]*types.Course, error) {
+	return fetchCourses(d.db)
+}
+
+func fetchCourses(db qrm.DB) ([]*types.Course, error) {
 	stmt := SELECT(
 		Courses.AllColumns,
 		Quotas.AllColumns,
 	).FROM(
 		Courses.
 			INNER_JOIN(Quotas, Quotas.ID.EQ(Courses.QuotaID)),
+	).ORDER_BY(
+		Courses.TimeSlot.ASC(),
+		Quotas.Name.ASC(),
 	)
 
 	var result coursesResult
 
-	err := stmt.Query(d.db, &result)
+	err := stmt.Query(db, &result)
 	if err != nil {
 		return nil, err
 	}

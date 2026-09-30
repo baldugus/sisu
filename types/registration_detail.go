@@ -3,5 +3,6 @@ package types
 type RegistrationDetail struct {
 	Registration *Registration
 	Course       *Course
-	Call         *Call
+	// History lists every call entry of the registration, oldest call first.
+	History []*CallEntry
 }

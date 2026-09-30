@@ -7,15 +7,14 @@ type CloseCallCommand struct {
 }
 
 func (cmd *CloseCallCommand) Execute(db *database.Database) error {
-	hasPendingRegistrations, err := db.CallHasPendingRegistrations(cmd.ID)
+	hasPending, err := db.CallHasPendingEntries(cmd.ID)
 	if err != nil {
 		return err
 	}
 
-	if hasPendingRegistrations {
+	if hasPending {
 		return ErrCallHasPendingRegistrations{}
 	}
 
 	return db.CloseCall(cmd.ID)
-
 }

@@ -1,11 +1,15 @@
 package commands
 
 import (
+	"github.com/go-jet/jet/v2/qrm"
+
 	"github.com/baldugus/sisu/database"
 	"github.com/baldugus/sisu/types"
-	"github.com/go-jet/jet/v2/qrm"
 )
 
+// DeleteCallCommand removes the last call. Its entries are deleted with it
+// (ON DELETE CASCADE), which reverts everything the call did: called students
+// go back to the waitlist and promotions back to semester 2.
 type DeleteCallCommand struct {
 	ID int32
 }
@@ -16,7 +20,10 @@ func (cmd *DeleteCallCommand) Execute(db *database.Database) error {
 		return err
 	}
 
-	// Cannot delete a closed call
+	if call.Number == 1 {
+		return ErrCannotDeleteFirstCall{}
+	}
+
 	if call.Status == types.CallStatusDone {
 		return ErrCannotDeleteClosedCall{}
 	}
@@ -30,11 +37,11 @@ func (cmd *DeleteCallCommand) Execute(db *database.Database) error {
 		return ErrCannotDeleteCallWithLaterCalls{}
 	}
 
-	return db.RunInTx(func(tx qrm.DB) error {
-		if err := database.RevertRegistrationsToWaitlisted(tx, cmd.ID); err != nil {
-			return err
-		}
+	if err := requireNoSemesterClosedSince(db, call.Number); err != nil {
+		return err
+	}
 
+	return db.RunInTx(func(tx qrm.DB) error {
 		return database.DeleteCall(tx, cmd.ID)
 	})
 }

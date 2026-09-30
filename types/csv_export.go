@@ -33,6 +33,7 @@ type EnrolledRegistrationCSV struct {
 	Status               string `csv:"SITUACAO"`
 
 	// Course fields
-	Period string `csv:"TURNO"`
-	Quota  string `csv:"MODALIDADE"`
+	Period   string `csv:"TURNO"`
+	Quota    string `csv:"MODALIDADE"`
+	Semester int32  `csv:"SEMESTRE"`
 }

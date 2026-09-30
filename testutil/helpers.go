@@ -38,20 +38,14 @@ func LoadWaitlistSelection(t *testing.T, db *database.Database, filePath string)
 	require.NoError(t, err, "failed to load waitlist selection")
 }
 
-// CreateCall creates a new call and returns its ID.
+// CreateCall creates the next call and returns its ID.
 func CreateCall(t *testing.T, db *database.Database) int32 {
 	t.Helper()
 
-	semester, err := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
-	require.NoError(t, err, "failed to fetch semester")
-
-	cmd := commands.CreateCallCommand{
-		SemesterID: semester.ID,
-	}
-	err = cmd.Execute(db)
+	cmd := commands.CreateCallCommand{}
+	err := cmd.Execute(db)
 	require.NoError(t, err, "failed to create call")
 
-	// Get the last call number
 	lastCallNumber, err := db.GetLastCallNumber()
 	require.NoError(t, err)
 
@@ -62,7 +56,7 @@ func CreateCall(t *testing.T, db *database.Database) int32 {
 }
 
 // CloseCall closes a call by ID.
-// Note: The call must have no pending registrations to be closed.
+// Note: The call must have no pending entries to be closed.
 func CloseCall(t *testing.T, db *database.Database, callID int32) {
 	t.Helper()
 
@@ -71,16 +65,38 @@ func CloseCall(t *testing.T, db *database.Database, callID int32) {
 	require.NoError(t, err, "failed to close call")
 }
 
-// EnrollAllInCall enrolls all registrations in a call.
+// CallEntries returns the entries of a call, best ranked first.
+func CallEntries(t *testing.T, db *database.Database, callID int32) []*types.CallEntryDetail {
+	t.Helper()
+
+	entries, err := database.FetchCallEntryDetails(db.DB(), callID, nil, nil)
+	require.NoError(t, err, "failed to fetch call entries")
+
+	return entries
+}
+
+// RegistrationsInCall returns the registrations of a call, best ranked first.
+func RegistrationsInCall(t *testing.T, db *database.Database, callID int32) []*types.Registration {
+	t.Helper()
+
+	entries := CallEntries(t, db, callID)
+
+	regs := make([]*types.Registration, len(entries))
+	for i, e := range entries {
+		regs[i] = e.Registration
+	}
+
+	return regs
+}
+
+// EnrollAllInCall marks every pending entry of a call as enrolled (accepting
+// pending promotions).
 func EnrollAllInCall(t *testing.T, db *database.Database, callID int32) {
 	t.Helper()
 
-	registrations, err := db.FetchRegistrationsByCallID(callID)
-	require.NoError(t, err, "failed to fetch registrations")
-
-	for _, reg := range registrations {
-		if reg.Status == types.RegistrationStatusApproved {
-			EnrollRegistration(t, db, reg.ID)
+	for _, e := range CallEntries(t, db, callID) {
+		if e.Entry.Outcome == types.CallEntryOutcomePending {
+			SetOutcome(t, db, callID, e.Entry.RegistrationID, types.CallEntryOutcomeEnrolled)
 		}
 	}
 }
@@ -93,43 +109,70 @@ func CloseCallWithEnrollment(t *testing.T, db *database.Database, callID int32) 
 	CloseCall(t, db, callID)
 }
 
-// EnrollRegistration marks a registration as enrolled.
+// SetOutcome records a registration's outcome in a call.
+func SetOutcome(
+	t *testing.T,
+	db *database.Database,
+	callID int32,
+	regID int32,
+	outcome types.CallEntryOutcome,
+) {
+	t.Helper()
+
+	cmd := commands.SetCallEntryOutcomeCommand{
+		CallID:         callID,
+		RegistrationID: regID,
+		Outcome:        outcome,
+	}
+
+	err := cmd.Execute(db)
+	require.NoError(t, err, "failed to set outcome %s", outcome)
+}
+
+// SetWantsPromotion records a semester-2 student's request to move to semester 1.
+func SetWantsPromotion(t *testing.T, db *database.Database, callID int32, regID int32, wants bool) {
+	t.Helper()
+
+	cmd := commands.SetWantsPromotionCommand{
+		CallID:         callID,
+		RegistrationID: regID,
+		WantsPromotion: wants,
+	}
+
+	err := cmd.Execute(db)
+	require.NoError(t, err, "failed to set wants promotion")
+}
+
+// latestCallID returns the call of the registration's most recent entry.
+func latestCallID(t *testing.T, db *database.Database, regID int32) int32 {
+	t.Helper()
+
+	history, err := database.FetchRegistrationHistory(db.DB(), regID)
+	require.NoError(t, err)
+	require.NotEmpty(t, history, "registration %d has no call entries", regID)
+
+	return history[len(history)-1].CallID
+}
+
+// EnrollRegistration marks a registration as enrolled in its latest call.
 func EnrollRegistration(t *testing.T, db *database.Database, regID int32) {
 	t.Helper()
 
-	cmd := commands.UpdateRegistrationStatusCommand{
-		RegistrationID: regID,
-		NewStatus:      types.RegistrationStatusEnrolled,
-	}
-
-	err := cmd.Execute(db)
-	require.NoError(t, err, "failed to enroll registration")
+	SetOutcome(t, db, latestCallID(t, db, regID), regID, types.CallEntryOutcomeEnrolled)
 }
 
-// MarkRegistrationAbsent marks a registration as absent.
+// MarkRegistrationAbsent marks a registration as absent in its latest call.
 func MarkRegistrationAbsent(t *testing.T, db *database.Database, regID int32) {
 	t.Helper()
 
-	cmd := commands.UpdateRegistrationStatusCommand{
-		RegistrationID: regID,
-		NewStatus:      types.RegistrationStatusAbsent,
-	}
-
-	err := cmd.Execute(db)
-	require.NoError(t, err, "failed to mark registration absent")
+	SetOutcome(t, db, latestCallID(t, db, regID), regID, types.CallEntryOutcomeAbsent)
 }
 
-// ClearRegistrationStatus resets a registration status to approved.
+// ClearRegistrationStatus resets a registration's latest entry to pending.
 func ClearRegistrationStatus(t *testing.T, db *database.Database, regID int32) {
 	t.Helper()
 
-	cmd := commands.UpdateRegistrationStatusCommand{
-		RegistrationID: regID,
-		NewStatus:      types.RegistrationStatusApproved,
-	}
-
-	err := cmd.Execute(db)
-	require.NoError(t, err, "failed to clear registration status")
+	SetOutcome(t, db, latestCallID(t, db, regID), regID, types.CallEntryOutcomePending)
 }
 
 // DeleteApprovedSelection deletes the approved selection.

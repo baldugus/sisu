@@ -47,19 +47,25 @@ func AssertCallStatus(
 		"call %d should have status %s", callID, expectedStatus)
 }
 
-// AssertCourseOccupiedSeats verifies the number of occupied seats in a course.
-func AssertCourseOccupiedSeats(
-	t *testing.T,
-	db *database.Database,
-	courseID int32,
-	expectedOccupied int32,
-) {
+// AssertRegistrationSemester verifies the semester a registration currently holds.
+func AssertRegistrationSemester(t *testing.T, db *database.Database, regID int32, expected *int32) {
 	t.Helper()
 
-	occupied, err := database.CountCourseOccupiedSeats(db.DB(), courseID)
+	detail, err := db.FetchRegistrationByID(regID)
 	require.NoError(t, err)
-	assert.Equal(t, expectedOccupied, occupied,
-		"course %d should have %d occupied seats", courseID, expectedOccupied)
+	assert.Equal(t, expected, detail.Registration.Semester,
+		"registration %d should be in semester %v", regID, expected)
+}
+
+// AssertSemesterOccupancy verifies how many seats each semester has taken.
+func AssertSemesterOccupancy(t *testing.T, db *database.Database, sem1, sem2 int32) {
+	t.Helper()
+
+	semesters, err := db.FetchSemesters()
+	require.NoError(t, err)
+	require.Len(t, semesters, 2)
+	assert.Equal(t, sem1, semesters[0].Occupied, "semester 1 occupancy")
+	assert.Equal(t, sem2, semesters[1].Occupied, "semester 2 occupancy")
 }
 
 // AssertDatabaseEmpty verifies that the database has no data in main tables.
@@ -74,7 +80,7 @@ func AssertDatabaseEmpty(t *testing.T, db *database.Database) {
 	require.NoError(t, err)
 	assert.Empty(t, registrations, "registrations table should be empty")
 
-	calls, err := db.FetchCalls()
+	calls, err := db.FetchCallSummaries()
 	require.NoError(t, err)
 	assert.Empty(t, calls, "calls table should be empty")
 
@@ -116,8 +122,8 @@ func AssertRegistrationCount(t *testing.T, db *database.Database, expected int) 
 func AssertRegistrationsInCall(t *testing.T, db *database.Database, callID int32, expected int) {
 	t.Helper()
 
-	registrations, err := db.FetchRegistrationsByCallID(callID)
+	entries, err := database.FetchCallEntryDetails(db.DB(), callID, nil, nil)
 	require.NoError(t, err)
-	assert.Len(t, registrations, expected,
+	assert.Len(t, entries, expected,
 		"call %d should have %d registrations", callID, expected)
 }

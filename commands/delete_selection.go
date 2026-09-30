@@ -47,7 +47,7 @@ func (cmd *DeleteSelectionCommand) Execute(db *database.Database) error {
 		return ErrCannotDeleteWithClosedFirstCall{}
 	}
 
-	hasModified, err := db.SelectionHasModifiedRegistrations(cmd.Kind)
+	hasModified, err := db.SelectionHasModifiedEntries(cmd.Kind)
 	if err != nil {
 		return fmt.Errorf("check modified registrations: %w", err)
 	}
@@ -67,7 +67,7 @@ func (cmd *DeleteSelectionCommand) Execute(db *database.Database) error {
 		// delete everything. Otherwise, only delete waitlist-specific data.
 		if cmd.Kind == types.SelectionKindApproved {
 			// Delete all data - safe because waitlist doesn't exist
-			// Delete candidates first - CASCADE will automatically delete their registrations
+			// Delete candidates first - CASCADE deletes their registrations and call entries
 			if err := database.DeleteAllCandidates(tx); err != nil {
 				return fmt.Errorf("delete candidates: %w", err)
 			}
@@ -79,6 +79,9 @@ func (cmd *DeleteSelectionCommand) Execute(db *database.Database) error {
 			}
 			if err := database.DeleteAllCalls(tx); err != nil {
 				return fmt.Errorf("delete calls: %w", err)
+			}
+			if err := database.ReopenAllSemesters(tx); err != nil {
+				return fmt.Errorf("reopen semesters: %w", err)
 			}
 		} else {
 			// Only delete waitlist-specific data, preserve approved selection data

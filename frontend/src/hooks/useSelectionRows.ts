@@ -39,6 +39,7 @@ async function loadRowsForSelection(
       Status: reg.Status?.toUpperCase() ?? defaultStatus,
       EnrollmentID: reg.EnrollmentID,
       Ranking: reg.Ranking,
+      Semester: reg.Semester,
     };
   });
   return mapped.filter((r): r is RowData => r !== null);

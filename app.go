@@ -51,23 +51,41 @@ func translateError(err error) error {
 	case errors.As(err, &commands.ErrCannotDeleteApprovedWithWaitlist{}):
 		return errors.New("Não é possível excluir a lista de aprovados enquanto a lista de espera existir.")
 	case errors.As(err, &commands.ErrSelectionHasModifiedRegistrations{}):
-		return errors.New("Não é possível excluir a seleção com inscrições matriculadas ou ausentes.")
+		return errors.New("Não é possível excluir a seleção depois que a chamada já recebeu matrículas, faltas ou pedidos de adiantamento.")
 	case errors.As(err, &commands.ErrCallHasPendingRegistrations{}):
 		return errors.New("Não é possível fechar a chamada com inscrições pendentes.")
 	case errors.As(err, &commands.ErrRegistrationNotFound{}):
 		return errors.New("Inscrição não encontrada.")
-	case errors.As(err, &commands.ErrRegistrationNotInCall{}):
-		return errors.New("Inscrição não está em uma chamada.")
 	case errors.As(err, &commands.ErrCallNotOpen{}):
 		return errors.New("A chamada não está aberta.")
 	case errors.As(err, &commands.ErrInvalidStatusTransition{}):
-		return errors.New("Transição de status inválida.")
-	case errors.As(err, &commands.ErrNoSeatsAvailable{}):
-		return errors.New("Não há vagas disponíveis no curso.")
+		return errors.New("Situação inválida para este tipo de convocação.")
 	case errors.As(err, &commands.ErrOpenCallExists{}):
 		return errors.New("Não é possível criar nova chamada enquanto outra está aberta.")
-	case errors.As(err, &commands.ErrNoWaitlistedRegistrations{}):
-		return errors.New("Não há inscrições na lista de espera.")
+	case errors.As(err, &commands.ErrNoCandidatesToCall{}):
+		return errors.New("Não há candidatos para convocar: nenhum pedido de adiantamento nem ninguém na lista de espera para as vagas abertas.")
+	case errors.As(err, &commands.ErrAllSemestersClosed{}):
+		return errors.New("Os dois semestres estão fechados.")
+	case errors.As(err, &commands.ErrNoCalls{}):
+		return errors.New("Importe a lista de aprovados antes.")
+	case errors.As(err, &commands.ErrCallNotFound{}):
+		return errors.New("Chamada não encontrada.")
+	case errors.As(err, &commands.ErrCannotDeleteFirstCall{}):
+		return errors.New("A primeira chamada só pode ser removida excluindo a lista de aprovados.")
+	case errors.As(err, &commands.ErrSemesterClosedAfterCall{}):
+		return errors.New("Um semestre foi fechado depois desta chamada. Reabra o semestre antes.")
+	case errors.As(err, &commands.ErrInvalidSemester{}):
+		return errors.New("Semestre inválido.")
+	case errors.As(err, &commands.ErrSemesterAlreadyClosed{}):
+		return errors.New("O semestre já está fechado.")
+	case errors.As(err, &commands.ErrSemesterNotClosed{}):
+		return errors.New("O semestre não está fechado.")
+	case errors.As(err, &commands.ErrCannotReopenSemesterWithLaterCalls{}):
+		return errors.New("Não é possível reabrir o semestre enquanto existem chamadas criadas depois do fechamento.")
+	case errors.As(err, &commands.ErrCannotCloseSemesterWithOpenCall{}):
+		return errors.New("Feche a chamada aberta antes de fechar o semestre.")
+	case errors.As(err, &commands.ErrPromotionNotAllowed{}):
+		return errors.New("Só alunos do 2º semestre que não faltaram podem pedir adiantamento.")
 	case errors.As(err, &commands.ErrAllCoursesFull{}):
 		return errors.New("Todas as vagas de todos os cursos estão ocupadas.")
 	case errors.As(err, &commands.ErrCannotReopenCallWithLaterCalls{}):
@@ -184,7 +202,7 @@ func (a *App) FetchWaitlistSelection() (*types.Selection, error) {
 	return selection, nil
 }
 
-func (a *App) FetchCalls() ([]*types.Call, error) {
+func (a *App) FetchCalls() ([]*types.CallSummary, error) {
 	cmd := commands.FetchCallsCommand{}
 
 	calls, err := cmd.Execute(a.sisu.database)
@@ -267,17 +285,15 @@ func (a *App) FetchRegistrationsByCourseID(courseID int32) ([]*types.Registratio
 	return registrations, nil
 }
 
-func (a *App) FetchRegistrationsByCallID(callID int32) ([]*types.Registration, error) {
-	cmd := commands.FetchRegistrationsCommand{
-		CallID: &callID,
-	}
+func (a *App) FetchCallEntries(callID int32) ([]*types.CallEntryDetail, error) {
+	cmd := commands.FetchCallEntriesCommand{CallID: callID}
 
-	registrations, err := cmd.Execute(a.sisu.database)
+	entries, err := cmd.Execute(a.sisu.database)
 	if err != nil {
 		return nil, translateError(err)
 	}
 
-	return registrations, nil
+	return entries, nil
 }
 
 func (a *App) FetchRegistration(registrationID int32) (*types.RegistrationDetail, error) {
@@ -305,10 +321,18 @@ func (a *App) CloseCall(id int32) error {
 	return nil
 }
 
-func (a *App) EnrollRegistration(id int32) error {
-	cmd := commands.UpdateRegistrationStatusCommand{
-		RegistrationID: id,
-		NewStatus:      types.RegistrationStatusEnrolled,
+// SetCallEntryOutcome records a registration's outcome in the open call:
+// "pending", "enrolled", "absent" or, for promotion offers, "declined".
+func (a *App) SetCallEntryOutcome(callID int32, registrationID int32, outcome string) error {
+	parsed, err := types.ParseCallEntryOutcome(outcome)
+	if err != nil {
+		return errors.New("Situação inválida.")
+	}
+
+	cmd := commands.SetCallEntryOutcomeCommand{
+		CallID:         callID,
+		RegistrationID: registrationID,
+		Outcome:        parsed,
 	}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {
@@ -318,10 +342,12 @@ func (a *App) EnrollRegistration(id int32) error {
 	return nil
 }
 
-func (a *App) AbsentRegistration(id int32) error {
-	cmd := commands.UpdateRegistrationStatusCommand{
-		RegistrationID: id,
-		NewStatus:      types.RegistrationStatusAbsent,
+// SetWantsPromotion records that a semester-2 student asked to move to semester 1.
+func (a *App) SetWantsPromotion(callID int32, registrationID int32, wants bool) error {
+	cmd := commands.SetWantsPromotionCommand{
+		CallID:         callID,
+		RegistrationID: registrationID,
+		WantsPromotion: wants,
 	}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {
@@ -331,11 +357,8 @@ func (a *App) AbsentRegistration(id int32) error {
 	return nil
 }
 
-func (a *App) ClearRegistrationStatus(id int32) error {
-	cmd := commands.UpdateRegistrationStatusCommand{
-		RegistrationID: id,
-		NewStatus:      types.RegistrationStatusApproved,
-	}
+func (a *App) CloseSemester(number int32) error {
+	cmd := commands.CloseSemesterCommand{Number: number}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {
 		return translateError(err)
@@ -344,8 +367,30 @@ func (a *App) ClearRegistrationStatus(id int32) error {
 	return nil
 }
 
-func (a *App) CreateCall(semesterID int32) error {
-	cmd := commands.CreateCallCommand{SemesterID: semesterID}
+func (a *App) ReopenSemester(number int32) error {
+	cmd := commands.ReopenSemesterCommand{Number: number}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return translateError(err)
+	}
+
+	return nil
+}
+
+// PreviewCall shows who the next call would summon, without creating it.
+func (a *App) PreviewCall() (*types.CallPlan, error) {
+	cmd := commands.PreviewCallCommand{}
+
+	plan, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return nil, translateError(err)
+	}
+
+	return plan, nil
+}
+
+func (a *App) CreateCall() error {
+	cmd := commands.CreateCallCommand{}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {
 		return translateError(err)
@@ -378,7 +423,7 @@ func (a *App) DeleteCall(id int32) error {
 	return nil
 }
 
-func (a *App) WebsitePDF(callID int32, period string, filePath string) error {
+func (a *App) WebsitePDF(callID int32, period string, semester int32, filePath string) error {
 	coursePeriod, err := types.ParseCoursePeriod(period)
 	if err != nil {
 		return errors.New("Período inválido.")
@@ -387,6 +432,7 @@ func (a *App) WebsitePDF(callID int32, period string, filePath string) error {
 	cmd := commands.CreateWebsitePDFCommand{
 		CallID:   callID,
 		Period:   coursePeriod,
+		Semester: semester,
 		FilePath: filePath,
 	}
 
@@ -397,7 +443,7 @@ func (a *App) WebsitePDF(callID int32, period string, filePath string) error {
 	return nil
 }
 
-func (a *App) EnrollmentPDF(callID int32, period string, filePath string) error {
+func (a *App) EnrollmentPDF(callID int32, period string, semester int32, filePath string) error {
 	coursePeriod, err := types.ParseCoursePeriod(period)
 	if err != nil {
 		return errors.New("Período inválido.")
@@ -406,6 +452,7 @@ func (a *App) EnrollmentPDF(callID int32, period string, filePath string) error 
 	cmd := commands.CreateEnrollmentPDFCommand{
 		CallID:   callID,
 		Period:   coursePeriod,
+		Semester: semester,
 		FilePath: filePath,
 	}
 
@@ -416,7 +463,7 @@ func (a *App) EnrollmentPDF(callID int32, period string, filePath string) error 
 	return nil
 }
 
-func (a *App) EmailPDF(callID int32, period string, filePath string) error {
+func (a *App) EmailPDF(callID int32, period string, semester int32, filePath string) error {
 	coursePeriod, err := types.ParseCoursePeriod(period)
 	if err != nil {
 		return errors.New("Período inválido.")
@@ -425,6 +472,7 @@ func (a *App) EmailPDF(callID int32, period string, filePath string) error {
 	cmd := commands.CreateEmailPDFCommand{
 		CallID:   callID,
 		Period:   coursePeriod,
+		Semester: semester,
 		FilePath: filePath,
 	}
 
@@ -435,7 +483,7 @@ func (a *App) EmailPDF(callID int32, period string, filePath string) error {
 	return nil
 }
 
-func (a *App) TeacherPDF(period string, filePath string) error {
+func (a *App) TeacherPDF(period string, semester int32, filePath string) error {
 	coursePeriod, err := types.ParseCoursePeriod(period)
 	if err != nil {
 		return errors.New("Período inválido.")
@@ -443,6 +491,7 @@ func (a *App) TeacherPDF(period string, filePath string) error {
 
 	cmd := commands.CreateTeacherPDFCommand{
 		Period:   coursePeriod,
+		Semester: semester,
 		FilePath: filePath,
 	}
 

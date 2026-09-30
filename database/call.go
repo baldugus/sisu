@@ -8,24 +8,7 @@ import (
 	. "github.com/go-jet/jet/v2/sqlite"
 )
 
-func (d *Database) FetchCalls() ([]*types.Call, error) {
-	stmt := SELECT(
-		Calls.AllColumns,
-	).FROM(
-		Calls,
-	)
-
-	var result callsResult
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.toCallsDomain(), nil
-}
-
-func (d *Database) FetchCallByID(callID int32) (*types.Call, error) {
+func FetchCallByID(db qrm.DB, callID int32) (*types.Call, error) {
 	stmt := SELECT(
 		Calls.AllColumns,
 	).FROM(
@@ -36,12 +19,16 @@ func (d *Database) FetchCallByID(callID int32) (*types.Call, error) {
 
 	var result model.Calls
 
-	err := stmt.Query(d.db, &result)
+	err := stmt.Query(db, &result)
 	if err != nil {
 		return nil, err
 	}
 
 	return toCallDomain(&result), nil
+}
+
+func (d *Database) FetchCallByID(callID int32) (*types.Call, error) {
+	return FetchCallByID(d.db, callID)
 }
 
 func CreateCall(db qrm.DB, call *types.Call) (int32, error) {
@@ -56,34 +43,6 @@ func CreateCall(db qrm.DB, call *types.Call) (int32, error) {
 	}
 
 	return result.ID, nil
-}
-
-func (d *Database) CallHasPendingRegistrations(ID int32) (bool, error) {
-	stmt := SELECT(
-		Registrations.ID,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Calls, Calls.ID.EQ(Registrations.CallID)),
-	).WHERE(
-		Calls.ID.EQ(Int32(ID)).
-			AND(Registrations.Status.IN(
-				String(types.RegistrationStatusApproved.String()),
-				String(types.RegistrationStatusWaitlisted.String()),
-			)),
-	)
-
-	var result []int32
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return false, err
-	}
-
-	if len(result) > 0 {
-		return true, nil
-	}
-
-	return false, nil
 }
 
 func (d *Database) CloseCall(ID int32) error {

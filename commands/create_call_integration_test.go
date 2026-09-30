@@ -12,200 +12,255 @@ import (
 	"github.com/baldugus/sisu/types"
 )
 
-func TestCreateCall_Success(t *testing.T) {
-	// Arrange
+func ptr(v int32) *int32 { return &v }
+
+// splitCycle loads approved_split.csv (one course, 4 seats, ranks 1-4: ranks 1-2
+// in semester 1, 3-4 in semester 2) and waitlist_split.csv (ranks 5-8), and
+// returns call 1 and its registrations by rank (index 0 = rank 1).
+func splitCycle(t *testing.T) (*database.TestDB, int32, []*types.Registration) {
+	t.Helper()
+
 	db := database.NewTestDatabase(t)
+	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_split.csv")
+	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_split.csv")
 
-	// Load approved and waitlist selections
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
-	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_small.csv")
-
-	// Close first call so we can create a new one
 	call1, err := db.FetchCallByNumber(1)
 	require.NoError(t, err)
-	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
-	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
+	regs := testutil.RegistrationsInCall(t, db.Database, call1.ID)
+	require.Len(t, regs, 4)
 
-	// Act
-	err = cmd.Execute(db.Database)
-
-	// Assert
-	require.NoError(t, err)
-
-	// Verify call #2 was created
-	call2 := testutil.AssertCallCreated(t, db.Database, 2)
-	testutil.AssertCallStatus(t, db.Database, call2, types.CallStatusCalling)
-
-	// Verify waitlisted students were promoted
-	registrationsInCall2, err := db.FetchRegistrationsByCallID(call2)
-	require.NoError(t, err)
-	assert.Greater(t, len(registrationsInCall2), 0, "should have promoted some students")
+	return db, call1.ID, regs
 }
 
-func TestCreateCall_ErrOpenCallExists(t *testing.T) {
-	// Arrange
-	db := database.NewTestDatabase(t)
+func waitlistByRank(t *testing.T, db *database.Database) []*types.Registration {
+	t.Helper()
 
-	// Load approved selection (creates call #1 with status "calling")
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
+	selection := testutil.AssertSelectionExists(t, db, types.SelectionKindWaitlist)
+	regs, err := db.FetchRegistrationsBySelectionID(selection.ID)
+	require.NoError(t, err)
+	require.Len(t, regs, 4)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
-	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
-
-	// Act
-	err := cmd.Execute(db.Database)
-
-	// Assert
-	require.Error(t, err)
-	assert.ErrorAs(t, err, &commands.ErrOpenCallExists{})
+	return regs
 }
 
-func TestCreateCall_ErrNoWaitlistedRegistrations(t *testing.T) {
-	// Arrange
-	db := database.NewTestDatabase(t)
-
-	// Load only approved selection (no waitlist)
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
-
-	// Close first call
-	call1, err := db.FetchCallByNumber(1)
-	require.NoError(t, err)
-	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
-
-	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
-	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
-
-	// Act
-	err = cmd.Execute(db.Database)
-
-	// Assert
-	require.Error(t, err)
-	assert.ErrorAs(t, err, &commands.ErrNoWaitlistedRegistrations{})
-}
-
-// TestCreateCall_ErrAllCoursesFull tests the scenario where all courses are at capacity.
-// Note: This test is skipped because with our small test data (5 approved, 10+15 seats),
-// we can't easily fill all seats. The error case is tested in unit tests.
-func TestCreateCall_ErrAllCoursesFull(t *testing.T) {
-	t.Skip("Test data doesn't support filling all course seats - error case covered elsewhere")
-}
-
-func TestCreateCall_PromotesCorrectNumberOfStudents(t *testing.T) {
-	// Arrange
-	db := database.NewTestDatabase(t)
-
-	// Load approved and waitlist selections
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
-	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_small.csv")
-
-	// Close first call
-	call1, err := db.FetchCallByNumber(1)
-	require.NoError(t, err)
-	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
-
-	// Count available seats
-	courses, err := db.FetchCourses()
-	require.NoError(t, err)
-
-	totalAvailableSeats := int32(0)
-	for _, course := range courses {
-		occupied, err := database.CountCourseOccupiedSeats(db.DB(), course.ID)
-		require.NoError(t, err)
-		available := course.Seats - occupied
-		if available > 0 {
-			totalAvailableSeats += available
+func entryIDs(entries []*types.CallEntryDetail, kind types.CallEntryKind, semester int32) []int32 {
+	var ids []int32
+	for _, e := range entries {
+		if e.Entry.Kind == kind && e.Entry.Semester == semester {
+			ids = append(ids, e.Entry.RegistrationID)
 		}
 	}
 
-	// Count waitlisted students
-	waitlistSelection := testutil.AssertSelectionExists(t, db.Database, types.SelectionKindWaitlist)
-	waitlistRegs, err := db.FetchRegistrationsBySelectionID(waitlistSelection.ID)
-	require.NoError(t, err)
-	waitlistCount := int32(len(waitlistRegs))
-
-	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
-	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
-
-	// Act
-	err = cmd.Execute(db.Database)
-
-	// Assert
-	require.NoError(t, err)
-
-	// Verify promoted count
-	call2 := testutil.AssertCallCreated(t, db.Database, 2)
-	promotedRegs, err := db.FetchRegistrationsByCallID(call2)
-	require.NoError(t, err)
-
-	// Should promote min(waitlist count, available seats)
-	expectedPromoted := waitlistCount
-	if totalAvailableSeats < waitlistCount {
-		expectedPromoted = totalAvailableSeats
-	}
-
-	assert.Equal(t, int(expectedPromoted), len(promotedRegs),
-		"should promote correct number of students")
+	return ids
 }
 
-func TestCreateCall_IncrementCallNumber(t *testing.T) {
-	// Arrange
+func TestLoadApproved_SplitsSemestersInCallOne(t *testing.T) {
+	db, call1, regs := splitCycle(t)
+
+	entries := testutil.CallEntries(t, db.Database, call1)
+	assert.Equal(t, []int32{regs[0].ID, regs[1].ID}, entryIDs(entries, types.CallEntryKindInitial, 1))
+	assert.Equal(t, []int32{regs[2].ID, regs[3].ID}, entryIDs(entries, types.CallEntryKindInitial, 2))
+
+	testutil.AssertRegistrationSemester(t, db.Database, regs[0].ID, ptr(1))
+	testutil.AssertRegistrationSemester(t, db.Database, regs[3].ID, ptr(2))
+	testutil.AssertSemesterOccupancy(t, db.Database, 2, 2)
+}
+
+func TestCreateCall_ErrOpenCallExists(t *testing.T) {
+	db := database.NewTestDatabase(t)
+	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
+
+	cmd := commands.CreateCallCommand{}
+	err := cmd.Execute(db.Database)
+
+	testutil.AssertErrorType(t, err, commands.ErrOpenCallExists{})
+}
+
+func TestCreateCall_ErrNoCalls(t *testing.T) {
 	db := database.NewTestDatabase(t)
 
-	// Load approved and waitlist selections
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
-	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_small.csv")
+	cmd := commands.CreateCallCommand{}
+	err := cmd.Execute(db.Database)
 
-	// Close first call
+	testutil.AssertErrorType(t, err, commands.ErrNoCalls{})
+}
+
+func TestCreateCall_ErrNoCandidatesToCall(t *testing.T) {
+	db := database.NewTestDatabase(t)
+	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
+
 	call1, err := db.FetchCallByNumber(1)
 	require.NoError(t, err)
 	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
-	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
-
-	// Act
+	cmd := commands.CreateCallCommand{}
 	err = cmd.Execute(db.Database)
 
-	// Assert
-	require.NoError(t, err)
-
-	// Verify call number is 2
-	call2, err := db.FetchCallByNumber(2)
-	require.NoError(t, err)
-	assert.Equal(t, int32(2), call2.Number)
+	testutil.AssertErrorType(t, err, commands.ErrNoCandidatesToCall{})
 }
 
-func TestCreateCall_PromotedStudentsHaveApprovedStatus(t *testing.T) {
-	// Arrange
-	db := database.NewTestDatabase(t)
+func TestCreateCall_ErrAllCoursesFull(t *testing.T) {
+	db, call1, _ := splitCycle(t)
+	testutil.CloseCallWithEnrollment(t, db.Database, call1)
 
-	// Load approved and waitlist selections
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
-	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_small.csv")
+	cmd := commands.CreateCallCommand{}
+	err := cmd.Execute(db.Database)
 
-	// Close first call
-	call1, err := db.FetchCallByNumber(1)
+	testutil.AssertErrorType(t, err, commands.ErrAllCoursesFull{})
+}
+
+func TestCreateCall_WaitlistFillsSemesterOneFirst(t *testing.T) {
+	db, call1, regs := splitCycle(t)
+	waitlist := waitlistByRank(t, db.Database)
+
+	// One absence in each semester opens one seat in each.
+	testutil.SetOutcome(t, db.Database, call1, regs[0].ID, types.CallEntryOutcomeAbsent)
+	testutil.SetOutcome(t, db.Database, call1, regs[2].ID, types.CallEntryOutcomeAbsent)
+	testutil.CloseCallWithEnrollment(t, db.Database, call1)
+
+	call2 := testutil.CreateCall(t, db.Database)
+
+	entries := testutil.CallEntries(t, db.Database, call2)
+	assert.Equal(t, []int32{waitlist[0].ID}, entryIDs(entries, types.CallEntryKindWaitlist, 1), "best ranked goes to semester 1")
+	assert.Equal(t, []int32{waitlist[1].ID}, entryIDs(entries, types.CallEntryKindWaitlist, 2))
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindPromotion, 1))
+
+	testutil.AssertRegistrationStatus(t, db.Database, waitlist[0].ID, types.RegistrationStatusApproved)
+	testutil.AssertRegistrationSemester(t, db.Database, waitlist[0].ID, ptr(1))
+	testutil.AssertRegistrationStatus(t, db.Database, waitlist[2].ID, types.RegistrationStatusWaitlisted)
+	testutil.AssertSemesterOccupancy(t, db.Database, 2, 2)
+}
+
+func TestCreateCall_PreviewMatchesCreatedCall(t *testing.T) {
+	db, call1, regs := splitCycle(t)
+
+	testutil.SetOutcome(t, db.Database, call1, regs[1].ID, types.CallEntryOutcomeAbsent)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, true)
+	testutil.CloseCallWithEnrollment(t, db.Database, call1)
+
+	preview := commands.PreviewCallCommand{}
+	plan, err := preview.Execute(db.Database)
 	require.NoError(t, err)
-	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
-	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
+	assert.Equal(t, int32(2), plan.Number)
+	require.Len(t, plan.Courses, 1)
+	assert.Equal(t, int32(1), plan.Courses[0].Vacancies1)
+	assert.Equal(t, int32(0), plan.Courses[0].Vacancies2)
+	require.Len(t, plan.Courses[0].Promoted, 1)
+	assert.Equal(t, regs[2].ID, plan.Courses[0].Promoted[0].ID)
+	assert.Empty(t, plan.Courses[0].Waitlist1)
+	assert.Equal(t, int32(1), plan.Total())
 
-	// Act
-	err = cmd.Execute(db.Database)
+	call2 := testutil.CreateCall(t, db.Database)
+	entries := testutil.CallEntries(t, db.Database, call2)
+	require.Len(t, entries, 1)
+	assert.Equal(t, types.CallEntryKindPromotion, entries[0].Entry.Kind)
+	assert.Equal(t, regs[2].ID, entries[0].Entry.RegistrationID)
+}
 
-	// Assert
+// TestPromotionFlow walks the promotion rules: a semester-2 student who asked to
+// move up is offered semester 1 before the waitlist; while the offer is pending
+// or declined they stay in semester 2; accepting moves them and frees their
+// semester-2 seat for the next call.
+func TestPromotionFlow(t *testing.T) {
+	db, call1, regs := splitCycle(t)
+	waitlist := waitlistByRank(t, db.Database)
+
+	// Call 1: rank 1 (sem 1) absent; ranks 3 and 4 (sem 2) both want semester 1.
+	testutil.SetOutcome(t, db.Database, call1, regs[0].ID, types.CallEntryOutcomeAbsent)
+	testutil.SetOutcome(t, db.Database, call1, regs[2].ID, types.CallEntryOutcomeEnrolled)
+	testutil.SetOutcome(t, db.Database, call1, regs[3].ID, types.CallEntryOutcomeEnrolled)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, true)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[3].ID, true)
+	testutil.CloseCallWithEnrollment(t, db.Database, call1)
+
+	// Call 2: the single semester-1 seat goes to the best ranked requester.
+	call2 := testutil.CreateCall(t, db.Database)
+	entries := testutil.CallEntries(t, db.Database, call2)
+	assert.Equal(t, []int32{regs[2].ID}, entryIDs(entries, types.CallEntryKindPromotion, 1))
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindWaitlist, 1), "promotion took the only seat")
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindWaitlist, 2), "semester 2 is full until the promotion is accepted")
+
+	// A pending offer leaves the student enrolled in semester 2.
+	testutil.AssertRegistrationStatus(t, db.Database, regs[2].ID, types.RegistrationStatusEnrolled)
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(2))
+
+	// Declined: still semester 2, and never offered again.
+	testutil.SetOutcome(t, db.Database, call2, regs[2].ID, types.CallEntryOutcomeDeclined)
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(2))
+	testutil.AssertSemesterOccupancy(t, db.Database, 1, 2)
+	testutil.CloseCall(t, db.Database, call2)
+
+	// Call 3: the next requester gets the seat.
+	call3 := testutil.CreateCall(t, db.Database)
+	entries = testutil.CallEntries(t, db.Database, call3)
+	assert.Equal(t, []int32{regs[3].ID}, entryIDs(entries, types.CallEntryKindPromotion, 1))
+
+	// Accepted: moves to semester 1, freeing a semester-2 seat.
+	testutil.SetOutcome(t, db.Database, call3, regs[3].ID, types.CallEntryOutcomeEnrolled)
+	testutil.AssertRegistrationStatus(t, db.Database, regs[3].ID, types.RegistrationStatusEnrolled)
+	testutil.AssertRegistrationSemester(t, db.Database, regs[3].ID, ptr(1))
+	testutil.AssertSemesterOccupancy(t, db.Database, 2, 1)
+	testutil.CloseCall(t, db.Database, call3)
+
+	// Call 4: the freed semester-2 seat goes to the waitlist.
+	call4 := testutil.CreateCall(t, db.Database)
+	entries = testutil.CallEntries(t, db.Database, call4)
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindPromotion, 1))
+	assert.Equal(t, []int32{waitlist[0].ID}, entryIDs(entries, types.CallEntryKindWaitlist, 2))
+
+	// History shows every step for the promoted student.
+	detail, err := db.FetchRegistrationByID(regs[3].ID)
 	require.NoError(t, err)
+	require.Len(t, detail.History, 2)
+	assert.Equal(t, int32(1), detail.History[0].CallNumber)
+	assert.Equal(t, types.CallEntryKindInitial, detail.History[0].Kind)
+	assert.True(t, detail.History[0].WantsPromotion)
+	assert.Equal(t, int32(3), detail.History[1].CallNumber)
+	assert.Equal(t, types.CallEntryKindPromotion, detail.History[1].Kind)
+}
 
-	// Verify promoted students have "approved" status (not waitlisted anymore)
-	call2 := testutil.AssertCallCreated(t, db.Database, 2)
-	promotedRegs, err := db.FetchRegistrationsByCallID(call2)
-	require.NoError(t, err)
+// TestUndoToImport deletes and reopens calls in reverse order and checks that
+// the cycle returns exactly to the state right after the import.
+func TestUndoToImport(t *testing.T) {
+	db, call1, regs := splitCycle(t)
 
-	for _, reg := range promotedRegs {
-		assert.Equal(t, types.RegistrationStatusApproved, reg.Status,
-			"promoted registration %d should have approved status", reg.ID)
+	testutil.SetOutcome(t, db.Database, call1, regs[0].ID, types.CallEntryOutcomeAbsent)
+	testutil.SetOutcome(t, db.Database, call1, regs[2].ID, types.CallEntryOutcomeEnrolled)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, true)
+	testutil.CloseCallWithEnrollment(t, db.Database, call1)
+
+	call2 := testutil.CreateCall(t, db.Database)
+	testutil.CloseCallWithEnrollment(t, db.Database, call2) // accepts the promotion
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(1))
+
+	closeSem := commands.CloseSemesterCommand{Number: 1}
+	require.NoError(t, closeSem.Execute(db.Database))
+
+	// Undo, most recent action first.
+	reopenCall := commands.OpenCallCommand{ID: call2}
+	testutil.AssertErrorType(t, reopenCall.Execute(db.Database), commands.ErrSemesterClosedAfterCall{})
+
+	reopenSem := commands.ReopenSemesterCommand{Number: 1}
+	require.NoError(t, reopenSem.Execute(db.Database))
+	require.NoError(t, reopenCall.Execute(db.Database))
+
+	deleteCall := commands.DeleteCallCommand{ID: call2}
+	require.NoError(t, deleteCall.Execute(db.Database))
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(2))
+
+	reopenCall1 := commands.OpenCallCommand{ID: call1}
+	require.NoError(t, reopenCall1.Execute(db.Database))
+
+	for _, reg := range regs {
+		testutil.ClearRegistrationStatus(t, db.Database, reg.ID)
 	}
+
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, false)
+
+	// Back to "just imported": the approved list can be deleted again.
+	testutil.DeleteWaitlistSelection(t, db.Database)
+	testutil.DeleteApprovedSelection(t, db.Database)
+	testutil.AssertDatabaseEmpty(t, db.Database)
 }

@@ -14,16 +14,24 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCpf } from '@/lib/format';
-import { getStatus, STATUSES } from '@/lib/status';
+import { toast } from 'sonner';
 import {
-  FetchRegistration,
-  ClearRegistrationStatus,
-  AbsentRegistration,
-  EnrollRegistration,
-} from '@/lib/backend';
+  getStatus,
+  outcomeToStatus,
+  semesterLabel,
+  statusLabelForKind,
+  statusToOutcome,
+  statusesForKind,
+  KIND_LABELS,
+  type EntryKind,
+  type StatusDef,
+  type StatusValue,
+} from '@/lib/status';
+import { FetchRegistration, SetCallEntryOutcome } from '@/lib/backend';
+import type { types } from '../../../wailsjs/go/models';
 
 interface RegistrationDialogProps {
   open: boolean;
@@ -31,6 +39,10 @@ interface RegistrationDialogProps {
   id: number;
   initialStatus: string;
   hasSelector: boolean;
+  /** Call being edited; outcome changes apply to this call's entry. */
+  callId?: number;
+  /** Kind of the entry in that call (promotion offers accept/decline). */
+  kind?: EntryKind;
   onStatusChanged: () => void;
 }
 
@@ -43,8 +55,7 @@ function parseScore(value?: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function StatusPill({ status }: { status: string }) {
-  const def = getStatus(status);
+function StatusPill({ def }: { def: StatusDef }) {
   return (
     <span
       className={cn(
@@ -133,14 +144,41 @@ const SCORE_FIELDS: { key: string; label: string }[] = [
   { key: 'Nota Redação', label: 'Redação' },
 ];
 
-const MUTABLE_STATUSES = STATUSES.filter(
-  (s) => s.value === 'APPROVED' || s.value === 'ABSENT' || s.value === 'ENROLLED'
-);
+function HistoryItem({ entry }: { entry: types.CallEntry }) {
+  const kind = entry.Kind as EntryKind;
+  const def = statusLabelForKind(outcomeToStatus(entry.Outcome), kind);
+  return (
+    <li className="flex items-center gap-3 text-sm">
+      <span className="w-7 h-7 rounded-full bg-muted text-muted-foreground font-heading font-black text-xs flex items-center justify-center shrink-0">
+        {entry.CallNumber}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-foreground">
+          {kind === 'promotion' ? (
+            <span className="inline-flex items-center gap-1">
+              <ArrowUp className="size-3.5 text-primary" /> Promoção para o 1º semestre
+            </span>
+          ) : (
+            <>
+              {KIND_LABELS[kind] ?? kind} · {semesterLabel(entry.Semester)} semestre
+            </>
+          )}
+        </p>
+        {entry.WantsPromotion && (
+          <p className="text-xs text-muted-foreground">Pediu para adiantar para o 1º semestre</p>
+        )}
+      </div>
+      <StatusPill def={def} />
+    </li>
+  );
+}
 
 export function RegistrationDialog({
-  open, onOpenChange, id, initialStatus, hasSelector, onStatusChanged,
+  open, onOpenChange, id, initialStatus, hasSelector, callId, kind, onStatusChanged,
 }: RegistrationDialogProps) {
   const [detail, setDetail] = useState<Record<string, any>>({});
+  const [history, setHistory] = useState<types.CallEntry[]>([]);
+  const [current, setCurrent] = useState<{ status: string; semester?: number }>({ status: initialStatus });
   const [loading, setLoading] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(initialStatus);
   const [applying, setApplying] = useState(false);
@@ -155,7 +193,8 @@ export function RegistrationDialog({
         const reg = d.Registration;
         const c = reg?.Candidate;
         const course = d.Course;
-        const call = d.Call;
+        setHistory(d.History ?? []);
+        setCurrent({ status: reg?.Status?.toUpperCase() ?? initialStatus, semester: reg?.Semester });
 
         setDetail({
           Nome: c?.Name,
@@ -183,24 +222,30 @@ export function RegistrationDialog({
           Turno: course?.Period === 'morning' ? 'Matutino' : course?.Period === 'evening' ? 'Noturno' : course?.Period,
           Cota: course?.Quota,
           Vagas: course?.Seats,
-          ...(call ? { Chamada: call.Number } : {}),
         });
       })
       .finally(() => setLoading(false));
   }, [open, id, initialStatus]);
 
   async function applyStatus() {
+    const outcome = statusToOutcome(pendingStatus);
+    if (callId == null || !outcome) return;
     setApplying(true);
     try {
-      if (pendingStatus === 'APPROVED') await ClearRegistrationStatus(id);
-      else if (pendingStatus === 'ABSENT') await AbsentRegistration(id);
-      else if (pendingStatus === 'ENROLLED') await EnrollRegistration(id);
+      await SetCallEntryOutcome(callId, id, outcome);
       onStatusChanged();
       onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ocorreu um erro.');
     } finally {
       setApplying(false);
     }
   }
+
+  const pendingDef =
+    callId != null
+      ? statusLabelForKind(getStatus(pendingStatus).value as StatusValue, kind)
+      : getStatus(current.status);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -218,8 +263,13 @@ export function RegistrationDialog({
           <>
             {/* Persistent identity + headline stats — does not scroll */}
             <div className="px-6 py-5 border-b border-border shrink-0">
-              <div className="flex items-center pr-8">
-                <StatusPill status={pendingStatus} />
+              <div className="flex items-center gap-2 pr-8">
+                <StatusPill def={pendingDef} />
+                {current.semester && (
+                  <span className="text-xs text-muted-foreground">
+                    {current.status === 'ENROLLED' ? 'Matriculado(a)' : 'Vaga'} no {current.semester}º semestre
+                  </span>
+                )}
               </div>
               <h2
                 title={detail['Nome']}
@@ -242,6 +292,20 @@ export function RegistrationDialog({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
+              <Section label="Histórico de chamadas">
+                {history.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ainda não foi convocado(a).</p>
+                ) : (
+                  <ol className="flex flex-col gap-2">
+                    {history.map((e) => (
+                      <HistoryItem key={e.CallID} entry={e} />
+                    ))}
+                  </ol>
+                )}
+              </Section>
+
+              <Separator className="mb-4" />
+
               <Section label="Desempenho por área">
                 <div className="flex flex-col gap-1.5">
                   {SCORE_FIELDS.map(({ key, label }) => (
@@ -289,7 +353,6 @@ export function RegistrationDialog({
                   <Field label="Turno" value={detail['Turno']} />
                   <Field label="Cota" value={detail['Cota']} />
                   <Field label="Vagas" value={detail['Vagas']} />
-                  <Field label="Chamada" value={detail['Chamada']} />
                 </div>
               </Section>
             </div>
@@ -303,7 +366,7 @@ export function RegistrationDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MUTABLE_STATUSES.map((s) => (
+                {statusesForKind(kind).map((s) => (
                   <SelectItem key={s.value} value={s.value} className="text-xs">
                     {s.label}
                   </SelectItem>

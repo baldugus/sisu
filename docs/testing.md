@@ -83,15 +83,20 @@ testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
 testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_small.csv")
 
 // Create and manage calls
-// (resolves Semester 1 of year 2025 internally via FetchSemesterByYearAndNumber)
 callID := testutil.CreateCall(t, db.Database)
 testutil.CloseCall(t, db.Database, callID)
 testutil.CloseCallWithEnrollment(t, db.Database, callID) // Enrolls all first
+regs := testutil.RegistrationsInCall(t, db.Database, callID) // best ranked first
+entries := testutil.CallEntries(t, db.Database, callID)
 
-// Update registration statuses
+// Record outcomes in a specific call
+testutil.SetOutcome(t, db.Database, callID, regID, types.CallEntryOutcomeDeclined)
+testutil.SetWantsPromotion(t, db.Database, callID, regID, true)
+
+// Shortcuts acting on the registration's latest call entry
 testutil.EnrollRegistration(t, db.Database, regID)
 testutil.MarkRegistrationAbsent(t, db.Database, regID)
-testutil.ClearRegistrationStatus(t, db.Database, regID)
+testutil.ClearRegistrationStatus(t, db.Database, regID) // back to pending
 
 // Delete selections
 testutil.DeleteApprovedSelection(t, db.Database)
@@ -106,7 +111,8 @@ Domain-specific assertions:
 // Assert specific states
 testutil.AssertRegistrationStatus(t, db.Database, regID, types.RegistrationStatusEnrolled)
 testutil.AssertCallStatus(t, db.Database, callID, types.CallStatusDone)
-testutil.AssertCourseOccupiedSeats(t, db.Database, courseID, 10)
+testutil.AssertRegistrationSemester(t, db.Database, regID, &semester) // nil = no seat
+testutil.AssertSemesterOccupancy(t, db.Database, 2, 2)
 
 // Assert existence
 selection := testutil.AssertSelectionExists(t, db.Database, types.SelectionKindApproved)
@@ -126,6 +132,8 @@ Pre-created CSV files for testing:
 
 - **approved_small.csv** - 5 approved students across 2 courses (morning: 10 seats, evening: 15 seats)
 - **waitlist_small.csv** - 3 waitlisted students
+- **approved_split.csv** - 4 approved students in one course with 4 seats (ranks 1-2 → semester 1, 3-4 → semester 2); use it to exercise promotions and semester-specific vacancies
+- **waitlist_split.csv** - 4 waitlisted students for that course (ranks 5-8)
 - **invalid_missing_fields.csv** - Malformed CSV for error testing
 
 ## Writing Integration Tests
