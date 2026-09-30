@@ -149,10 +149,16 @@ func FetchCallEntryDetails(
 	details := make([]*types.CallEntryDetail, len(result))
 	for i := range result {
 		r := &result[i]
+
+		course, err := toCourseDomain(&r.Course, r.Quota.Name)
+		if err != nil {
+			return nil, err
+		}
+
 		details[i] = &types.CallEntryDetail{
 			Entry:        toCallEntryDomain(&r.CallEntries, r.Call.Number),
 			Registration: r.Registration.toRegistrationDomain(),
-			Course:       toCourseDomain(&r.Course, r.Quota.Name),
+			Course:       course,
 		}
 	}
 

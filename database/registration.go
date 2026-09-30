@@ -127,7 +127,7 @@ func (d *Database) FetchEnrolledRegistrationDetails() ([]*types.RegistrationDeta
 		return nil, err
 	}
 
-	return result.toRegistrationDetails(), nil
+	return result.toRegistrationDetails()
 }
 
 // FetchRegistrationByID returns a registration with its course and full call history.
@@ -143,7 +143,10 @@ func FetchRegistrationByID(db qrm.DB, registrationID int32) (*types.Registration
 		return nil, err
 	}
 
-	detail := result.toRegistrationDetail()
+	detail, err := result.toRegistrationDetail()
+	if err != nil {
+		return nil, err
+	}
 
 	detail.History, err = FetchRegistrationHistory(db, registrationID)
 	if err != nil {

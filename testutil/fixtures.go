@@ -50,11 +50,22 @@ func NewTestCandidate(overrides ...func(*types.Candidate)) *types.Candidate {
 	return candidate
 }
 
+// NewTestSeats returns the seat count for the given total. It panics on an odd
+// total, which can only be a mistake in the test itself.
+func NewTestSeats(total int32) types.Seats {
+	seats, err := types.NewSeats(total)
+	if err != nil {
+		panic(err)
+	}
+
+	return seats
+}
+
 // NewTestCourse creates a test Course with sensible defaults.
 func NewTestCourse(overrides ...func(*types.Course)) *types.Course {
 	course := &types.Course{
 		Period:       types.CoursePeriodMorning,
-		Seats:        20,
+		Seats:        NewTestSeats(20),
 		MinimumScore: &types.Score{Value: 50000}, // 500.00 in Score format
 		Quota:        "Ampla concorrência",
 	}

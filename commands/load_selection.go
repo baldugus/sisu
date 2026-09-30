@@ -87,12 +87,12 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 				return err
 			}
 
-			if cmd.Kind == types.SelectionKindApproved && parsedReg.Registration.Semester != nil {
+			if cmd.Kind == types.SelectionKindApproved {
 				entries = append(entries, &types.CallEntry{
 					CallID:         callID,
 					RegistrationID: registrationID,
 					Kind:           types.CallEntryKindInitial,
-					Semester:       *parsedReg.Registration.Semester,
+					Semester:       parsedReg.Course.SemesterForRanking(parsedReg.Registration.Ranking),
 					Outcome:        types.CallEntryOutcomePending,
 				})
 			}

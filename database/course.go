@@ -34,12 +34,16 @@ type courseResult struct {
 
 type coursesResult []courseResult
 
-func (c coursesResult) toCoursesDomain() []*types.Course {
+func (c coursesResult) toCoursesDomain() ([]*types.Course, error) {
 	courses := make([]*types.Course, len(c))
 	for i := range c {
-		courses[i] = toCourseDomain(&c[i].Courses, c[i].Quota.Name)
+		course, err := toCourseDomain(&c[i].Courses, c[i].Quota.Name)
+		if err != nil {
+			return nil, err
+		}
+		courses[i] = course
 	}
-	return courses
+	return courses, nil
 }
 
 func (d *Database) FetchCourses() ([]*types.Course, error) {
@@ -65,7 +69,7 @@ func fetchCourses(db qrm.DB) ([]*types.Course, error) {
 		return nil, err
 	}
 
-	return result.toCoursesDomain(), nil
+	return result.toCoursesDomain()
 }
 
 func (d *Database) FetchCourseByID(courseID int32) (*types.Course, error) {
@@ -86,7 +90,7 @@ func (d *Database) FetchCourseByID(courseID int32) (*types.Course, error) {
 		return nil, err
 	}
 
-	return toCourseDomain(&result.Courses, result.Quota.Name), nil
+	return toCourseDomain(&result.Courses, result.Quota.Name)
 }
 
 func (d *Database) FetchCoursesByPeriod(period types.CoursePeriod) ([]*types.Course, error) {
@@ -107,7 +111,7 @@ func (d *Database) FetchCoursesByPeriod(period types.CoursePeriod) ([]*types.Cou
 		return nil, err
 	}
 
-	return result.toCoursesDomain(), nil
+	return result.toCoursesDomain()
 }
 
 func DeleteAllCourses(db qrm.DB) error {

@@ -154,7 +154,7 @@ func allocationInput(
 	in := allocation.Input{Open: open, Courses: make([]allocation.Course, len(courses))}
 
 	for i, c := range courses {
-		in.Courses[i] = allocation.Course{ID: c.ID, Seats: c.Seats}
+		in.Courses[i] = allocation.Course{ID: c.ID, SeatsPerSemester: c.Seats.PerSemester()}
 		byCourse[c.ID] = &in.Courses[i]
 	}
 

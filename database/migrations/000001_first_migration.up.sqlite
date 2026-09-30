@@ -39,7 +39,7 @@ CREATE TABLE courses (
   id            INTEGER NOT NULL PRIMARY KEY,
   time_slot     TEXT NOT NULL CHECK ( time_slot IN ('morning', 'evening') ),
   quota_id      INTEGER NOT NULL REFERENCES quotas ON DELETE RESTRICT ON UPDATE RESTRICT,
-  seats         INTEGER NOT NULL,
+  seats         INTEGER NOT NULL CHECK ( seats % 2 = 0 ),
   minimum_score INTEGER NOT NULL
 );
 

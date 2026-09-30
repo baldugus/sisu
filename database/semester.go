@@ -72,7 +72,7 @@ func FetchSemesters(db qrm.DB) ([]*types.Semester, error) {
 		semester := toSemesterDomain(&result[i])
 
 		for _, course := range courses {
-			semester.Seats += types.SemesterSeats(course.Seats, semester.Number)
+			semester.Seats += course.Seats.PerSemester()
 		}
 
 		for _, o := range occupied {

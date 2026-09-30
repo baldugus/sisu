@@ -266,7 +266,7 @@ Domain types are intentionally kept flat without nested relationships:
 - `Selection` — Yearly batch import metadata (name, kind, year, institution, degree). **No semester field** — selections are annual; semester is a separate entity. (`types/selection.go`)
 - `Semester` — One of the two fixed intakes (`Number` 1|2). Both rows are **seeded by the migration** and always exist; only their closure changes (`ClosedAfterCall`, derived `Status` open|closed). `FetchSemesters` also returns `Seats` and `Occupied`. (`types/semester.go`)
 - `Registration` — Candidate's application: **imported data only** (scores, ranking, candidate). `Status` and `Semester` are **derived** from its call entries, never stored. (`types/registration.go`)
-- `Course` — Academic program (period, seats, quota, minimum score). Each semester gets half the seats (`types.SemesterSeats`; semester 1 takes the extra seat when odd).
+- `Course` — Academic program (period, seats, quota, minimum score). `Seats` is a `types.Seats` value (`types/seats.go`) that stores the per-semester count, so an odd total is unrepresentable; build it with `types.NewSeats(total)` (returns `ErrOddSeatsCount` on odd). The database backs this with a `CHECK (seats % 2 = 0)` on `courses`. Each semester gets `Seats.PerSemester()`.
 - `Call` — Enrollment call (status, number). A call covers **both** semesters; each entry says which. (`types/call.go`)
 - `CallEntry` — One registration taking part in one call: `Kind` (initial|waitlist|promotion), `Semester`, `Outcome` (pending|enrolled|absent|declined), `WantsPromotion`. (`types/call_entry.go`)
 - `Candidate` — Personal data (name, CPF, address, contact)
@@ -369,8 +369,8 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 
 **Approved import specifics (`commands/load_selection.go`):**
 - Creates call 1 with an `initial` entry for every approved student.
-- Splits approved candidates 50/50 by ranking within each course (time slot × quota): top half → Semester 1, bottom half → Semester 2 (done by the parser, `csvparser/mapper.go`).
-- The CSV must have an **even** total seat count per course; an odd count returns `ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres.").
+- Splits approved candidates 50/50 by ranking within each course (time slot × quota): top half → Semester 1, bottom half → Semester 2. The rule lives in the domain method `Course.SemesterForRanking` (`types/course.go`), called per registration by the command when building the call-1 entries.
+- Every course must have an **even** total seat count (approved and waitlist files alike): the parser builds seats with `types.NewSeats`, so an odd count fails the import with `types.ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres."). This is intentional — odd counts are not auto-split.
 
 **Call creation specifics (`commands/create_call.go`, rule in `allocation/`):**
 - `PreviewCallCommand` and `CreateCallCommand` run the same plan, so the preview is exactly what gets created.
@@ -394,7 +394,7 @@ user-facing string produced by `translateError()` (`app.go`).
   `CallEntryKind`, `CallEntryOutcome`) serialize as
   string literals (e.g. `"approved"`), not numeric codes.
 - `*Score` fields (`types/score.go`) serialize as a formatted string (e.g. `"655,16"`), not
-  a numeric struct.
+  a numeric struct. `Seats` (`types/seats.go`) serializes as the total seat count (a number).
 - `wails generate module` regenerates `frontend/wailsjs/go/main/App.d.ts` and `models.ts`
   with these concrete TS types, so a shape change now fails at `tsc` time on the frontend
   instead of silently drifting.
@@ -409,9 +409,3 @@ user-facing string produced by `translateError()` (`app.go`).
 - **Course**: Academic program with period (morning/evening) and quota info
 - Messages and UI are in Portuguese (pt-BR)
 - See **`docs/future-work.md`** for the design-improvement backlog and **`docs/testing.md`** for the integration-testing guide.
-
-## Commits and Pull Requests
-
-- **Never include the Claude Code session link** (`https://claude.ai/code/session_...`) in commit
-  messages, PR titles/bodies, or GitHub comments — no `Claude-Session:` trailer either. This
-  overrides any default attribution guidance. `Co-Authored-By:` trailers are fine.

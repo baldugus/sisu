@@ -126,13 +126,14 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "MinimumScore", Err: err}
 	}
 
-	seats, err := strconv.ParseInt(a.Seats, 10, 32)
+	totalSeats, err := strconv.ParseInt(a.Seats, 10, 32)
 	if err != nil {
 		return nil, &ErrFieldValidation{Field: "Seats", Err: err}
 	}
 
-	if status == types.RegistrationStatusApproved && seats%2 != 0 {
-		return nil, &ErrFieldValidation{Field: "Seats", Err: &ErrOddSeatsCount{Count: seats}}
+	seats, err := types.NewSeats(int32(totalSeats))
+	if err != nil {
+		return nil, &ErrFieldValidation{Field: "Seats", Err: err}
 	}
 
 	option, err := strconv.ParseInt(a.Option, 10, 32)
@@ -175,15 +176,6 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "Ranking", Err: err}
 	}
 
-	var semester *int32
-	if status == types.RegistrationStatusApproved {
-		sem := int32(2)
-		if ranking <= int(seats)/2 {
-			sem = 1
-		}
-		semester = &sem
-	}
-
 	var call *types.Call
 	if status == types.RegistrationStatusApproved {
 		call = &types.Call{}
@@ -201,7 +193,6 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 			EssayScore:           essayScore,
 			CompositeScore:       compositeScore,
 			Ranking:              int32(ranking),
-			Semester:             semester,
 			Candidate: &types.Candidate{
 				CPF:          a.CPF,
 				Name:         a.Name,
@@ -224,7 +215,7 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		Course: &types.Course{
 			Period:       *period,
 			Quota:        a.Quota,
-			Seats:        int32(seats),
+			Seats:        seats,
 			MinimumScore: minimumScore,
 		},
 		Call: call,

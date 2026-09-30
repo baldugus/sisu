@@ -17,8 +17,6 @@ package allocation
 import (
 	"cmp"
 	"slices"
-
-	"github.com/baldugus/sisu/types"
 )
 
 // Candidate is a registration that may be called.
@@ -30,8 +28,9 @@ type Candidate struct {
 
 // Course is the allocation input for one course.
 type Course struct {
-	ID    int32
-	Seats int32
+	ID int32
+	// SeatsPerSemester is each semester's share of the course's seats.
+	SeatsPerSemester int32
 	// Occupied is indexed by semester - 1.
 	Occupied [2]int32
 	// Promotion lists semester-2 students eligible to move to semester 1.
@@ -82,8 +81,7 @@ func planCourse(course Course, open [2]bool) CourseResult {
 			continue
 		}
 
-		seats := types.SemesterSeats(course.Seats, int32(s+1)) //nolint: gosec
-		result.Vacancies[s] = max(0, seats-course.Occupied[s])
+		result.Vacancies[s] = max(0, course.SeatsPerSemester-course.Occupied[s])
 	}
 
 	promotion := SortByRanking(course.Promotion)

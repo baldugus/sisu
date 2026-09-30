@@ -130,10 +130,12 @@ testutil.AssertDatabaseEmpty(t, db.Database)
 
 Pre-created CSV files for testing:
 
-- **approved_small.csv** - 5 approved students across 2 courses (morning: 10 seats, evening: 15 seats)
+- **approved_small.csv** - 5 approved students across 2 courses (morning: 10 seats, evening: 16 seats)
+- **approved_split.csv** - Same students with 4 morning seats, so morning ranking 3 lands in Semester 2
+- **approved_odd_seats.csv** - Same students with 15 evening seats, for the odd-seat-count error
 - **waitlist_small.csv** - 3 waitlisted students
-- **approved_split.csv** - 4 approved students in one course with 4 seats (ranks 1-2 → semester 1, 3-4 → semester 2); use it to exercise promotions and semester-specific vacancies
-- **waitlist_split.csv** - 4 waitlisted students for that course (ranks 5-8)
+- **approved_promotion.csv** - 4 approved students in one course with 4 seats (ranks 1-2 → semester 1, 3-4 → semester 2); use it to exercise promotions and semester-specific vacancies
+- **waitlist_promotion.csv** - 4 waitlisted students for that course (ranks 5-8)
 - **invalid_missing_fields.csv** - Malformed CSV for error testing
 
 ## Writing Integration Tests

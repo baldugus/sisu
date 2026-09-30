@@ -88,7 +88,7 @@ func TestReopenSemester_OnlyWithoutLaterCalls(t *testing.T) {
 
 func TestDeleteApprovedSelection_ReopensSemesters(t *testing.T) {
 	db := database.NewTestDatabase(t)
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_split.csv")
+	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_promotion.csv")
 
 	require.NoError(t, database.SetSemesterClosedAfterCall(db.DB(), 2, ptr(1)))
 

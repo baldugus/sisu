@@ -18,13 +18,3 @@ type Semester struct {
 	// or enrolled).
 	Occupied int32
 }
-
-// SemesterSeats is a course's share of seats in one semester: half each, with
-// semester 1 taking the extra seat when the total is odd.
-func SemesterSeats(courseSeats int32, semester int32) int32 {
-	if semester == 1 {
-		return (courseSeats + 1) / 2 //nolint: mnd
-	}
-
-	return courseSeats / 2 //nolint: mnd
-}

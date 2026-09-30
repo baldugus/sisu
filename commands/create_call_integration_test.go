@@ -14,15 +14,15 @@ import (
 
 func ptr(v int32) *int32 { return &v }
 
-// splitCycle loads approved_split.csv (one course, 4 seats, ranks 1-4: ranks 1-2
-// in semester 1, 3-4 in semester 2) and waitlist_split.csv (ranks 5-8), and
+// splitCycle loads approved_promotion.csv (one course, 4 seats, ranks 1-4: ranks 1-2
+// in semester 1, 3-4 in semester 2) and waitlist_promotion.csv (ranks 5-8), and
 // returns call 1 and its registrations by rank (index 0 = rank 1).
 func splitCycle(t *testing.T) (*database.TestDB, int32, []*types.Registration) {
 	t.Helper()
 
 	db := database.NewTestDatabase(t)
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_split.csv")
-	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_split.csv")
+	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_promotion.csv")
+	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_promotion.csv")
 
 	call1, err := db.FetchCallByNumber(1)
 	require.NoError(t, err)

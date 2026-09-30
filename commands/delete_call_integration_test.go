@@ -95,8 +95,8 @@ func TestDeleteCallCommand_RevertsCalledStudentsToWaitlist(t *testing.T) {
 func TestDeleteCallCommand_CannotDeleteNonLastCall(t *testing.T) {
 	db := database.NewTestDatabase(t)
 
-	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_split.csv")
-	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_split.csv")
+	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_promotion.csv")
+	testutil.LoadWaitlistSelection(t, db.Database, "testdata/waitlist_promotion.csv")
 
 	call1, err := db.FetchCallByNumber(1)
 	require.NoError(t, err)
