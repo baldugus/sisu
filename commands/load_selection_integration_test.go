@@ -1,6 +1,7 @@
 package commands_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,6 +131,18 @@ func TestLoadSelection_BusinessRules(t *testing.T) {
 			},
 			expectedError: &commands.ErrWaitlistSelectionRequiresApproved{},
 		},
+		{
+			name: "cannot load approved with odd seat count",
+			setup: func(t *testing.T, db *database.Database) {
+				// No setup - empty database
+			},
+			cmd: commands.LoadSelectionCommand{
+				Year:     2025,
+				FilePath: "testdata/approved_odd_seats.csv",
+				Kind:     types.SelectionKindApproved,
+			},
+			expectedError: &commands.ErrOddSeatsCount{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -240,4 +253,48 @@ func findCourseByPeriod(t *testing.T, courses []*types.Course, period types.Cour
 	}
 	t.Fatalf("course with period %s not found", period)
 	return nil
+}
+
+func TestLoadApprovedSelection_SplitsBySemester(t *testing.T) {
+	// Arrange
+	db := database.NewTestDatabase(t)
+
+	// approved_split.csv: morning course has 4 seats (rankings 1, 2, 3),
+	// evening course has 16 seats (rankings 1, 2).
+	cmd := commands.LoadSelectionCommand{
+		Year:     2025,
+		FilePath: "testdata/approved_split.csv",
+		Kind:     types.SelectionKindApproved,
+	}
+
+	// Act
+	err := cmd.Execute(db.Database)
+
+	// Assert
+	require.NoError(t, err)
+
+	rows, err := db.DB().QueryContext(context.Background(), `
+		SELECT c.name, s.number
+		FROM registrations r
+		JOIN candidates c ON c.id = r.candidate_id
+		JOIN semesters s ON s.id = r.semester_id`)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	got := map[string]int32{}
+	for rows.Next() {
+		var name string
+		var number int32
+		require.NoError(t, rows.Scan(&name, &number))
+		got[name] = number
+	}
+	require.NoError(t, rows.Err())
+
+	assert.Equal(t, map[string]int32{
+		"João Silva":      1, // morning, ranking 1
+		"Maria Santos":    1, // morning, ranking 2
+		"Carlos Ferreira": 2, // morning, ranking 3
+		"Pedro Oliveira":  1, // evening, ranking 1
+		"Ana Costa":       1, // evening, ranking 2
+	}, got)
 }

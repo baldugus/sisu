@@ -117,11 +117,3 @@ type ErrNoRegistrationsFound struct{}
 func (e ErrNoRegistrationsFound) Error() string {
 	return "no candidates found in file"
 }
-
-type ErrOddSeatsCount struct {
-	Count int64
-}
-
-func (e ErrOddSeatsCount) Error() string {
-	return fmt.Sprintf("total seats must be an even number, got %d", e.Count)
-}

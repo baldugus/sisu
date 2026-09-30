@@ -42,7 +42,7 @@ func translateError(err error) error {
 		return errors.New("Arquivo CSV vazio.")
 	case errors.As(err, &csvparser.ErrFileParse{}):
 		return errors.New("Erro ao analisar o arquivo CSV. Contate o desenvolvedor.")
-	case errors.As(err, &csvparser.ErrOddSeatsCount{}):
+	case errors.As(err, &commands.ErrOddSeatsCount{}):
 		return errors.New("O número total de vagas deve ser par para divisão entre semestres.")
 	case errors.As(err, &csvparser.ErrLineMapping{}):
 		return errors.New("Erro de validação em um campo do arquivo CSV. Contate o desenvolvedor.")
