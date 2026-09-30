@@ -20,9 +20,9 @@ import { formatCpf } from '@/lib/format';
 import { getStatus, STATUSES } from '@/lib/status';
 import {
   FetchRegistration,
-  ClearApplicationStatus,
-  AbsentApplication,
-  EnrollApplication,
+  ClearRegistrationStatus,
+  AbsentRegistration,
+  EnrollRegistration,
 } from '@/lib/backend';
 
 interface RegistrationDialogProps {
@@ -192,9 +192,9 @@ export function RegistrationDialog({
   async function applyStatus() {
     setApplying(true);
     try {
-      if (pendingStatus === 'APPROVED') await ClearApplicationStatus(id);
-      else if (pendingStatus === 'ABSENT') await AbsentApplication(id);
-      else if (pendingStatus === 'ENROLLED') await EnrollApplication(id);
+      if (pendingStatus === 'APPROVED') await ClearRegistrationStatus(id);
+      else if (pendingStatus === 'ABSENT') await AbsentRegistration(id);
+      else if (pendingStatus === 'ENROLLED') await EnrollRegistration(id);
       onStatusChanged();
       onOpenChange(false);
     } finally {

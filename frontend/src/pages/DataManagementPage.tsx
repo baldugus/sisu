@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import {
   Backup,
   DeleteApprovedSelection,
-  DeleteInterestedSelection,
+  DeleteWaitlistSelection,
   Destroy,
   ExportCSV,
   FetchApprovedSelection,
-  FetchInterestedSelection,
+  FetchWaitlistSelection,
   OpenFileDialog,
   Restore,
   SaveFileDialog,
@@ -45,7 +45,7 @@ const DataManagementPage = () => {
       setHasApprovedData(false);
     }
     try {
-      const interested = await FetchInterestedSelection();
+      const interested = await FetchWaitlistSelection();
       setHasInterestedData(interested != null);
     } catch {
       setHasInterestedData(false);
@@ -68,7 +68,7 @@ const DataManagementPage = () => {
 
   const handleDeleteInterested = async () => {
     try {
-      await DeleteInterestedSelection();
+      await DeleteWaitlistSelection();
       toast.success("Em espera removidos com sucesso.");
       setHasInterestedData(false);
     } catch (e: any) {

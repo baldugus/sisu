@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   FetchApprovedSelection,
-  FetchInterestedSelection,
+  FetchWaitlistSelection,
   FetchRegistrationsBySelectionID,
-  FetchRollCalls,
+  FetchCalls,
 } from '@/lib/backend';
 
 interface SelectionInfo {
@@ -121,8 +121,8 @@ export default function Painel() {
       try {
         const [approvedRes, waitlistRes, callsRes] = await Promise.all([
           FetchApprovedSelection(),
-          FetchInterestedSelection(),
-          FetchRollCalls(),
+          FetchWaitlistSelection(),
+          FetchCalls(),
         ]);
 
         const approved = approvedRes;

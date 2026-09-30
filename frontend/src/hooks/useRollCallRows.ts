@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { RowData } from '@/components/RosterTable';
 import {
-  FetchApplicationsByRollCall,
+  FetchRegistrationsByCallID,
   FetchRegistration,
 } from '@/lib/backend';
 
@@ -21,7 +21,7 @@ export function useRollCallRows(callId: number) {
     setLoading(true);
     setError(null);
     try {
-      const apps = await FetchApplicationsByRollCall(callId) ?? [];
+      const apps = await FetchRegistrationsByCallID(callId) ?? [];
       const details = await Promise.all(apps.map((a) => FetchRegistration(a.ID)));
 
       const mapped: (RowData | null)[] = details.map((d) => {

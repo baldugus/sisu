@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  FetchRollCalls,
+  FetchCalls,
   FetchApprovedSelection,
   SaveFileDialog,
   WebsitePDF,
@@ -78,7 +78,7 @@ export default function Relatorios() {
 
   useEffect(() => {
     async function load() {
-      const [callsRes, approvedRes] = await Promise.all([FetchRollCalls(), FetchApprovedSelection()]);
+      const [callsRes, approvedRes] = await Promise.all([FetchCalls(), FetchApprovedSelection()]);
       const raw = callsRes ?? [];
       setCalls(raw.map((c) => ({ ID: c.ID, Number: c.Number, Status: c.Status?.toUpperCase?.() ?? 'DONE' })));
       const sel = approvedRes;

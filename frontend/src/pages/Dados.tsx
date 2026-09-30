@@ -27,13 +27,13 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   FetchApprovedSelection,
-  FetchInterestedSelection,
+  FetchWaitlistSelection,
   OpenFileDialog,
   SaveFileDialog,
   LoadApprovedSelection,
-  LoadInterestedSelection,
+  LoadWaitlistSelection,
   DeleteApprovedSelection,
-  DeleteInterestedSelection,
+  DeleteWaitlistSelection,
   Backup,
   Restore,
   Destroy,
@@ -134,7 +134,7 @@ function ImportModal({ type, open, onClose, approvedInfo, onSuccess }: ImportMod
     setBusy(true);
     try {
       const y = Number(resolvedYear);
-      if (isWaitlisted) await LoadInterestedSelection(y, filePath);
+      if (isWaitlisted) await LoadWaitlistSelection(y, filePath);
       else await LoadApprovedSelection(y, filePath);
       toast.success('Dados importados com sucesso.');
       onSuccess();
@@ -212,7 +212,7 @@ export default function Dados() {
   const [destroyConfirm, setDestroyConfirm] = useState('');
 
   async function loadInfo() {
-    const [a, w] = await Promise.all([FetchApprovedSelection(), FetchInterestedSelection()]);
+    const [a, w] = await Promise.all([FetchApprovedSelection(), FetchWaitlistSelection()]);
     setApprovedInfo(a ? { year: a.Year } : null);
     setWaitlistedInfo(w ? { year: w.Year } : null);
   }
@@ -299,7 +299,7 @@ export default function Dados() {
                 }
                 setImportModal('waitlisted');
               }}
-              onDelete={waitlistedInfo ? () => act('del-waitlisted', DeleteInterestedSelection, 'Lista de espera removida.') : undefined}
+              onDelete={waitlistedInfo ? () => act('del-waitlisted', DeleteWaitlistSelection, 'Lista de espera removida.') : undefined}
               busy={busy === 'del-waitlisted'}
             />
           </div>
