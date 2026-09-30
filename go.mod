@@ -1,8 +1,6 @@
 module github.com/baldugus/sisu
 
-go 1.24.0
-
-toolchain go1.24.5
+go 1.26.1
 
 require (
 	github.com/alecthomas/kong v1.15.0

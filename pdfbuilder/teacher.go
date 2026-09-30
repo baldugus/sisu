@@ -86,8 +86,8 @@ func (t *TeacherRenderer) Render(courses []*CourseInfo) ([]core.Row, error) {
 func (t *TeacherRenderer) header(selection *SelectionInfo, period string) []core.Row {
 	var header strings.Builder
 
-	header.WriteString(fmt.Sprintf("LISTA DE PRESENÇA - %s %d", selection.Institution, selection.Year))
-	header.WriteString(fmt.Sprintf(".%d", selection.Semester))
+	fmt.Fprintf(&header, "LISTA DE PRESENÇA - %s %d", selection.Institution, selection.Year)
+	fmt.Fprintf(&header, ".%d", selection.Semester)
 	period = fmt.Sprintf("TURNO: %s", period)
 
 	var textStyle props.Text

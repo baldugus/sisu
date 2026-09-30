@@ -122,9 +122,10 @@ func TestCompleteAdmissionCycle(t *testing.T) {
 	enrolledCount := 0
 	absentCount := 0
 	for _, reg := range allRegs {
-		if reg.Status == types.RegistrationStatusEnrolled {
+		switch reg.Status {
+		case types.RegistrationStatusEnrolled:
 			enrolledCount++
-		} else if reg.Status == types.RegistrationStatusAbsent {
+		case types.RegistrationStatusAbsent:
 			absentCount++
 		}
 	}

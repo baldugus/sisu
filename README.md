@@ -10,7 +10,7 @@ A rewrite is underway and has landed substantial pieces already: yearly (rather 
 
 ## Tech Stack
 
-- **Backend**: Go 1.24+ with the Wails v2 framework
+- **Backend**: Go 1.26+ with the Wails v2 framework
 - **Frontend**: React 18 + TypeScript + Vite (Tailwind v4 + shadcn/ui)
 - **Database**: SQLite with go-jet for queries and golang-migrate for migrations
 

@@ -99,11 +99,11 @@ func (e *EmailRenderer) header(selection *SelectionInfo, period string) []core.R
 
 	call.WriteString(string(selection.Kind))
 	if selection.WaitlistNum > 0 {
-		call.WriteString(fmt.Sprintf(" %d", selection.WaitlistNum))
+		fmt.Fprintf(&call, " %d", selection.WaitlistNum)
 	}
 
-	call.WriteString(fmt.Sprintf(" - %d - ", selection.Year))
-	call.WriteString(fmt.Sprintf("%do. Semestre", selection.Semester))
+	fmt.Fprintf(&call, " - %d - ", selection.Year)
+	fmt.Fprintf(&call, "%do. Semestre", selection.Semester)
 	period = fmt.Sprintf("TURNO: %s", period)
 
 	var headerText props.Text

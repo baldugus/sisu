@@ -25,7 +25,7 @@ func TestCreateCall_Success(t *testing.T) {
 	require.NoError(t, err)
 	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.Database.DB(), 2025, 1)
+	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
 	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
 
 	// Act
@@ -51,7 +51,7 @@ func TestCreateCall_ErrOpenCallExists(t *testing.T) {
 	// Load approved selection (creates call #1 with status "calling")
 	testutil.LoadApprovedSelection(t, db.Database, "testdata/approved_small.csv")
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.Database.DB(), 2025, 1)
+	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
 	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
 
 	// Act
@@ -74,7 +74,7 @@ func TestCreateCall_ErrNoWaitlistedRegistrations(t *testing.T) {
 	require.NoError(t, err)
 	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.Database.DB(), 2025, 1)
+	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
 	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
 
 	// Act
@@ -125,7 +125,7 @@ func TestCreateCall_PromotesCorrectNumberOfStudents(t *testing.T) {
 	require.NoError(t, err)
 	waitlistCount := int32(len(waitlistRegs))
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.Database.DB(), 2025, 1)
+	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
 	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
 
 	// Act
@@ -162,7 +162,7 @@ func TestCreateCall_IncrementCallNumber(t *testing.T) {
 	require.NoError(t, err)
 	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.Database.DB(), 2025, 1)
+	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
 	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
 
 	// Act
@@ -190,7 +190,7 @@ func TestCreateCall_PromotedStudentsHaveApprovedStatus(t *testing.T) {
 	require.NoError(t, err)
 	testutil.CloseCallWithEnrollment(t, db.Database, call1.ID)
 
-	semester, _ := database.FetchSemesterByYearAndNumber(db.Database.DB(), 2025, 1)
+	semester, _ := database.FetchSemesterByYearAndNumber(db.DB(), 2025, 1)
 	cmd := commands.CreateCallCommand{SemesterID: semester.ID}
 
 	// Act
@@ -209,4 +209,3 @@ func TestCreateCall_PromotedStudentsHaveApprovedStatus(t *testing.T) {
 			"promoted registration %d should have approved status", reg.ID)
 	}
 }
-
