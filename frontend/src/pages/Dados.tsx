@@ -69,7 +69,7 @@ function DataRow({
   busy?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-4 border-b border-border last:border-0">
+    <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-border last:border-0">
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm">{label}</p>
         {desc && <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>}
@@ -274,7 +274,7 @@ export default function Dados() {
         {/* ── Import ── */}
         <div>
           <SectionTitle>Importação de seleção</SectionTitle>
-          <div className="rounded-2xl border border-border">
+          <div className="rounded-2xl border border-border overflow-hidden">
             <DataRow
               label="Aprovados"
               desc="CSV dos candidatos convocados no SISU"
@@ -308,7 +308,7 @@ export default function Dados() {
         {/* ── Backup ── */}
         <div>
           <SectionTitle>Backup e restauração</SectionTitle>
-          <div className="rounded-2xl border border-border">
+          <div className="rounded-2xl border border-border overflow-hidden">
             <DataRow
               label="Salvar backup"
               desc="Exporta o banco de dados local para um arquivo SQLite"
@@ -331,7 +331,7 @@ export default function Dados() {
         {/* ── Quota reference ── */}
         <div>
           <SectionTitle>Referência de cotas</SectionTitle>
-          <div className="rounded-2xl border border-border divide-y divide-border">
+          <div className="rounded-2xl border border-border divide-y divide-border overflow-hidden">
             {QUOTAS.map(({ code, label }) => (
               <div key={code} className="flex gap-4 px-5 py-3">
                 <span className="font-mono font-black text-sm w-8 shrink-0 text-primary">{code}</span>
