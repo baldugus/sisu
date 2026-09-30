@@ -63,7 +63,7 @@ func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 				return err
 			}
 
-			availableSeats := course.Seats - occupiedSeats
+			availableSeats := course.Seats.Total() - occupiedSeats
 			if availableSeats <= 0 {
 				continue
 			}

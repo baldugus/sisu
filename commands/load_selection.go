@@ -109,8 +109,8 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 			}
 
 			var mappedSemesterID *int32
-			if parsedReg.Registration.SemesterID != nil {
-				switch *parsedReg.Registration.SemesterID {
+			if cmd.Kind == types.SelectionKindApproved {
+				switch parsedReg.Course.SemesterForRanking(parsedReg.Registration.Ranking) {
 				case 1:
 					mappedSemesterID = &sem1ID
 				case 2:

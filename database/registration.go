@@ -218,7 +218,7 @@ func (d *Database) FetchEnrolledRegistrationDetails() ([]*types.RegistrationDeta
 		return nil, err
 	}
 
-	return result.toRegistrationDetails(), nil
+	return result.toRegistrationDetails()
 }
 
 func (d *Database) FetchRegistrationByID(registrationID int32) (*types.RegistrationDetail, error) {
@@ -245,7 +245,7 @@ func (d *Database) FetchRegistrationByID(registrationID int32) (*types.Registrat
 		return nil, err
 	}
 
-	return result.toRegistrationDetail(), nil
+	return result.toRegistrationDetail()
 }
 
 func (d *Database) FetchSelectionKindByRegistrationID(registrationID int32) (types.SelectionKind, error) {

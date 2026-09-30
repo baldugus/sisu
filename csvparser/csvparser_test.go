@@ -475,6 +475,34 @@ func TestCsvCandidateParse(t *testing.T) {
 			},
 		},
 		{
+			name: "odd seats on approved list",
+			candidate: csvCandidate{
+				MinimumScore:   "600,0",
+				Seats:          "15",
+				SchedulePeriod: "Noturno",
+			},
+			status: types.RegistrationStatusApproved,
+			expectedErr: func(err error) bool {
+				var e *ErrFieldValidation
+				var oddErr types.ErrOddSeatsCount
+				return errors.As(err, &e) && e.Field == "Seats" && errors.As(err, &oddErr)
+			},
+		},
+		{
+			name: "odd seats on waitlist",
+			candidate: csvCandidate{
+				MinimumScore:   "600,0",
+				Seats:          "15",
+				SchedulePeriod: "Noturno",
+			},
+			status: types.RegistrationStatusWaitlisted,
+			expectedErr: func(err error) bool {
+				var e *ErrFieldValidation
+				var oddErr types.ErrOddSeatsCount
+				return errors.As(err, &e) && e.Field == "Seats" && errors.As(err, &oddErr)
+			},
+		},
+		{
 			name: "invalid option",
 			candidate: csvCandidate{
 				MinimumScore:   "600,0",

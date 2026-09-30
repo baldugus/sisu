@@ -124,7 +124,9 @@ testutil.AssertDatabaseEmpty(t, db.Database)
 
 Pre-created CSV files for testing:
 
-- **approved_small.csv** - 5 approved students across 2 courses (morning: 10 seats, evening: 15 seats)
+- **approved_small.csv** - 5 approved students across 2 courses (morning: 10 seats, evening: 16 seats)
+- **approved_split.csv** - Same students with 4 morning seats, so morning ranking 3 lands in Semester 2
+- **approved_odd_seats.csv** - Same students with 15 evening seats, for the odd-seat-count error
 - **waitlist_small.csv** - 3 waitlisted students
 - **invalid_missing_fields.csv** - Malformed CSV for error testing
 
