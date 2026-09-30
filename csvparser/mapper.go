@@ -131,10 +131,6 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "Seats", Err: err}
 	}
 
-	if status == types.RegistrationStatusApproved && seats%2 != 0 {
-		return nil, &ErrFieldValidation{Field: "Seats", Err: &ErrOddSeatsCount{Count: seats}}
-	}
-
 	option, err := strconv.ParseInt(a.Option, 10, 32)
 	if err != nil {
 		return nil, &ErrFieldValidation{Field: "Option", Err: err}
@@ -175,10 +171,13 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "Ranking", Err: err}
 	}
 
+	// Approved candidates are split between the year's two semester intakes by
+	// ranking. On an odd seat count, Semester 1 gets the extra seat (ceil for
+	// sem 1, floor for sem 2).
 	var semesterID *int32
 	if status == types.RegistrationStatusApproved {
 		sem := int32(2)
-		if ranking <= int(seats)/2 {
+		if ranking <= (int(seats)+1)/2 {
 			sem = 1
 		}
 		semesterID = &sem

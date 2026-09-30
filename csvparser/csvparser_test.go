@@ -576,3 +576,57 @@ func TestCsvCandidateParse(t *testing.T) {
 		})
 	}
 }
+
+func TestCsvCandidateParseSemesterSplit(t *testing.T) {
+	tests := []struct {
+		name         string
+		seats        string
+		ranking      string
+		status       types.RegistrationStatus
+		wantSemester *int32
+	}{
+		{name: "even seats, top half", seats: "20", ranking: "10", status: types.RegistrationStatusApproved, wantSemester: ptr(int32(1))},
+		{name: "even seats, bottom half", seats: "20", ranking: "11", status: types.RegistrationStatusApproved, wantSemester: ptr(int32(2))},
+		{name: "odd seats, extra seat goes to semester 1", seats: "21", ranking: "11", status: types.RegistrationStatusApproved, wantSemester: ptr(int32(1))},
+		{name: "odd seats, bottom half", seats: "21", ranking: "12", status: types.RegistrationStatusApproved, wantSemester: ptr(int32(2))},
+		{name: "single seat goes to semester 1", seats: "1", ranking: "1", status: types.RegistrationStatusApproved, wantSemester: ptr(int32(1))},
+		{name: "waitlist has no semester", seats: "21", ranking: "1", status: types.RegistrationStatusWaitlisted, wantSemester: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidate := csvCandidate{
+				SchedulePeriod:       "Matutino",
+				Seats:                tt.seats,
+				Option:               "1",
+				MinimumScore:         "600,0",
+				Ranking:              tt.ranking,
+				LanguagesScore:       "500,0",
+				HumanitiesScore:      "500,0",
+				NaturalSciencesScore: "500,0",
+				MathematicsScore:     "500,0",
+				EssayScore:           "500,0",
+				CompositeScore:       "500,0",
+			}
+
+			got, err := candidate.Parse(tt.status)
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+
+			gotSemester := got.Registration.SemesterID
+			switch {
+			case tt.wantSemester == nil && gotSemester != nil:
+				t.Errorf("expected no semester, got %d", *gotSemester)
+			case tt.wantSemester != nil && gotSemester == nil:
+				t.Errorf("expected semester %d, got none", *tt.wantSemester)
+			case tt.wantSemester != nil && *gotSemester != *tt.wantSemester:
+				t.Errorf("expected semester %d, got %d", *tt.wantSemester, *gotSemester)
+			}
+		})
+	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
+}
