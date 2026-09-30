@@ -126,7 +126,12 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		return nil, &ErrFieldValidation{Field: "MinimumScore", Err: err}
 	}
 
-	seats, err := strconv.ParseInt(a.Seats, 10, 32)
+	totalSeats, err := strconv.ParseInt(a.Seats, 10, 32)
+	if err != nil {
+		return nil, &ErrFieldValidation{Field: "Seats", Err: err}
+	}
+
+	seats, err := types.NewSeats(int32(totalSeats))
 	if err != nil {
 		return nil, &ErrFieldValidation{Field: "Seats", Err: err}
 	}
@@ -210,7 +215,7 @@ func (a *csvCandidate) Parse(status types.RegistrationStatus) (*ParsedRegistrati
 		Course: &types.Course{
 			Period:       *period,
 			Quota:        a.Quota,
-			Seats:        int32(seats),
+			Seats:        seats,
 			MinimumScore: minimumScore,
 		},
 		Call: call,

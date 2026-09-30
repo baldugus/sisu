@@ -7,10 +7,11 @@ tackle one at a time. None are blocking — the app works today.
 > type — bound `App` methods now return concrete typed values + `error`; and the alias-method
 > cleanup — the bound API now uses one vocabulary (`Registration`, `Call`, `Waitlist`) with no
 > aliases. See `CLAUDE.md` for the current contract. The semester-split policy was also
-> extracted out of the CSV parser into `types.Course.SemesterForRanking`.
+> extracted out of the CSV parser into `types.Course.SemesterForRanking`, with even seat counts
+> enforced by the `types.Seats` value type.
 >
 > Decided against: auto-splitting odd seat counts (Semester 1 taking the extra seat). An odd
-> seat count keeps failing the approved import with `ErrOddSeatsCount` on purpose.
+> seat count keeps failing the import with `ErrOddSeatsCount` on purpose.
 
 ## 1. (Open question) Make semester creation explicit, not a side effect
 

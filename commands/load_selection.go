@@ -110,12 +110,7 @@ func (cmd *LoadSelectionCommand) Execute(db *database.Database) error {
 
 			var mappedSemesterID *int32
 			if cmd.Kind == types.SelectionKindApproved {
-				semester, err := parsedReg.Course.SemesterForRanking(parsedReg.Registration.Ranking)
-				if err != nil {
-					return err
-				}
-
-				switch semester {
+				switch parsedReg.Course.SemesterForRanking(parsedReg.Registration.Ranking) {
 				case 1:
 					mappedSemesterID = &sem1ID
 				case 2:

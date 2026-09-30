@@ -1,0 +1,16 @@
+-- Course seats are split evenly between the year's two semester intakes, so
+-- an odd seat count is invalid (see types.Seats). SQLite cannot add a CHECK
+-- constraint to an existing table, so enforce it with triggers.
+CREATE TRIGGER courses_seats_even_insert
+BEFORE INSERT ON courses
+WHEN NEW.seats % 2 != 0
+BEGIN
+  SELECT RAISE(ABORT, 'courses.seats must be even');
+END;
+
+CREATE TRIGGER courses_seats_even_update
+BEFORE UPDATE OF seats ON courses
+WHEN NEW.seats % 2 != 0
+BEGIN
+  SELECT RAISE(ABORT, 'courses.seats must be even');
+END;

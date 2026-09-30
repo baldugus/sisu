@@ -1,6 +1,8 @@
 package database
 
 import (
+	"fmt"
+
 	"github.com/baldugus/sisu/database/.gen/model"
 	"github.com/baldugus/sisu/types"
 )
@@ -50,16 +52,25 @@ type fullRegistrationResult struct {
 
 type fullRegistrationsResult []fullRegistrationResult
 
-func (r fullRegistrationsResult) toRegistrationDetails() []*types.RegistrationDetail {
+func (r fullRegistrationsResult) toRegistrationDetails() ([]*types.RegistrationDetail, error) {
 	details := make([]*types.RegistrationDetail, len(r))
 	for i := range r {
-		details[i] = r[i].toRegistrationDetail()
+		detail, err := r[i].toRegistrationDetail()
+		if err != nil {
+			return nil, err
+		}
+		details[i] = detail
 	}
-	return details
+	return details, nil
 }
 
-func (r *fullRegistrationResult) toRegistrationDetail() *types.RegistrationDetail {
+func (r *fullRegistrationResult) toRegistrationDetail() (*types.RegistrationDetail, error) {
 	status, _ := types.ParseRegistrationStatus(r.Status)
+
+	course, err := toCourseDomain(&r.Course, r.Quota.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	return &types.RegistrationDetail{
 		Registration: &types.Registration{
@@ -76,9 +87,9 @@ func (r *fullRegistrationResult) toRegistrationDetail() *types.RegistrationDetai
 			Status:               status,
 			Candidate:            toCandidateDomain(&r.Candidate),
 		},
-		Course: toCourseDomain(&r.Course, r.Quota.Name),
+		Course: course,
 		Call:   toCallDomain(r.Call),
-	}
+	}, nil
 }
 
 func (r *registrationResult) toRegistrationDomain() *types.Registration {
@@ -192,21 +203,28 @@ func toSelectionModel(selection *types.Selection) *model.Selections {
 func toCourseModel(course *types.Course) *model.Courses {
 	return &model.Courses{
 		TimeSlot:     course.Period.String(),
-		Seats:        course.Seats,
+		Seats:        course.Seats.Total(),
 		MinimumScore: course.MinimumScore.Value,
 	}
 }
 
-func toCourseDomain(course *model.Courses, quotaName string) *types.Course {
+func toCourseDomain(course *model.Courses, quotaName string) (*types.Course, error) {
 	period, _ := types.ParseCoursePeriod(course.TimeSlot)
+
+	// The courses_seats_even triggers keep odd seat counts out of the database,
+	// so this only fails on a database written outside the app.
+	seats, err := types.NewSeats(course.Seats)
+	if err != nil {
+		return nil, fmt.Errorf("map course %d: %w", course.ID, err)
+	}
 
 	return &types.Course{
 		ID:           course.ID,
-		Seats:        course.Seats,
+		Seats:        seats,
 		MinimumScore: &types.Score{Value: course.MinimumScore},
 		Period:       period,
 		Quota:        quotaName,
-	}
+	}, nil
 }
 
 func toRegistrationModel(registration *types.Registration) *model.Registrations {

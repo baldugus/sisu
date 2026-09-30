@@ -266,7 +266,7 @@ Domain types are intentionally kept flat without nested relationships:
 - `Selection` — Yearly batch import metadata (name, kind, year, institution, degree). **No semester field** — selections are annual; semester is a separate entity. (`types/selection.go`)
 - `Semester` — Academic term within a selection year (ID, year, number 1|2, status open|closed). Auto-created when an approved selection is imported. (`types/semester.go`)
 - `Registration` — Candidate's application (scores, ranking, status, candidate, nullable `SemesterID`). Approved registrations carry a `SemesterID` (1 or 2); waitlisted registrations have `SemesterID = nil`. (`types/registration.go`)
-- `Course` — Academic program (period, seats, quota, minimum score)
+- `Course` — Academic program (period, seats, quota, minimum score). `Seats` is a `types.Seats` value (`types/seats.go`) that stores the per-semester count, so an odd total is unrepresentable; build it with `types.NewSeats(total)` (returns `ErrOddSeatsCount` on odd). The database backs this with the `courses_seats_even` triggers (migration `000002`).
 - `Call` — Enrollment call (status, number, `SemesterID`). Every call belongs to exactly one semester. (`types/call.go`)
 - `Candidate` — Personal data (name, CPF, address, contact)
 
@@ -353,8 +353,8 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 
 **Approved import specifics (`commands/load_selection.go`):**
 - Automatically finds-or-creates **Semester 1** and **Semester 2** records for the given year.
-- Splits approved candidates 50/50 by ranking: top half → Semester 1, bottom half → Semester 2. The rule lives in the domain method `Course.SemesterForRanking` (`types/course.go`), called per registration by the command; the CSV parser is policy-free and never sets `SemesterID`.
-- The CSV must have an **even** total seat count per course; an odd count returns `types.ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres."). This is intentional — odd counts are not auto-split.
+- Splits approved candidates 50/50 by ranking: top half → Semester 1, bottom half → Semester 2. The rule lives in the domain method `Course.SemesterForRanking` (`types/course.go`), called per registration by the command; the CSV parser never sets `SemesterID`.
+- Every course must have an **even** total seat count (approved and waitlist files alike): the parser builds seats with `types.NewSeats`, so an odd count fails the import with `types.ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres."). This is intentional — odd counts are not auto-split.
 
 **Call creation specifics (`commands/create_call.go`):**
 - Requires a `SemesterID`. For a Semester-1 call, priority Semester-2 registrations (declined promotions) are promoted first, then remaining seats are filled from the waitlist.
@@ -375,7 +375,7 @@ user-facing string produced by `translateError()` (`app.go`).
 - Enums (`RegistrationStatus`, `SelectionKind`, `CallStatus`, `CoursePeriod`) serialize as
   string literals (e.g. `"approved"`), not numeric codes.
 - `*Score` fields (`types/score.go`) serialize as a formatted string (e.g. `"655,16"`), not
-  a numeric struct.
+  a numeric struct. `Seats` (`types/seats.go`) serializes as the total seat count (a number).
 - `wails generate module` regenerates `frontend/wailsjs/go/main/App.d.ts` and `models.ts`
   with these concrete TS types, so a shape change now fails at `tsc` time on the frontend
   instead of silently drifting.

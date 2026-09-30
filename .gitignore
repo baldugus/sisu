@@ -3,5 +3,6 @@ tmp
 /node_modules
 /frontend/dist
 *.sqlite
+!/database/migrations/*.sqlite
 .golangci.yml
 mise.toml

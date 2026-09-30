@@ -166,7 +166,7 @@ func TestLoadSelection_TransactionRollback(t *testing.T) {
 	testutil.AssertDatabaseEmpty(t, db.Database)
 }
 
-func TestLoadApprovedSelection_OddSeatsRollsBack(t *testing.T) {
+func TestLoadApprovedSelection_OddSeatsRejected(t *testing.T) {
 	// Arrange
 	db := database.NewTestDatabase(t)
 
@@ -204,10 +204,10 @@ func TestLoadSelection_CreatesCourses(t *testing.T) {
 
 	// Verify course properties
 	morningCourse := findCourseByPeriod(t, courses, types.CoursePeriodMorning)
-	assert.Equal(t, int32(10), morningCourse.Seats)
+	assert.Equal(t, int32(10), morningCourse.Seats.Total())
 
 	eveningCourse := findCourseByPeriod(t, courses, types.CoursePeriodEvening)
-	assert.Equal(t, int32(16), eveningCourse.Seats)
+	assert.Equal(t, int32(16), eveningCourse.Seats.Total())
 }
 
 func TestLoadSelection_CreatesCandidates(t *testing.T) {
