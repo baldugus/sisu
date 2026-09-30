@@ -6,7 +6,7 @@ This document provides guidelines for AI coding agents working on the SISU codeb
 
 SISU is a full-stack desktop application for managing student admissions from Brazil's SiSU (Sistema de Selecao Unificada). It uses:
 - **Backend**: Go 1.24+ with Wails v2 framework
-- **Frontend**: React 18 + TypeScript + Vite — lives in a **git submodule** (`frontend/`), committed/tracked independently from the main repo
+- **Frontend**: React 18 + TypeScript + Vite — lives in `frontend/` in this same repository (monorepo; formerly the `sisu-frontend` submodule)
 - **Database**: SQLite with go-jet for queries and golang-migrate for migrations
 - **UI**: Tailwind CSS v4 + shadcn/ui (migration off Material Tailwind is complete)
 
@@ -38,6 +38,8 @@ wails dev
 wails build
 
 # Run all Go tests
+# (main.go embeds frontend/dist — run `cd frontend && npm run build` once first,
+# otherwise the root package fails with "pattern all:frontend/dist: no matching files found")
 go test ./...
 
 # Run tests in a specific package
@@ -86,7 +88,7 @@ sisu/
 ├── pdfbuilder/          # PDF report generation
 ├── types/               # Domain types and enums
 ├── testutil/            # Test fixtures, helpers, and assertions for integration tests
-└── frontend/            # React/TypeScript frontend (git submodule — separate repo)
+└── frontend/            # React/TypeScript frontend (see frontend/CLAUDE.md)
     ├── src/
     │   ├── components/  # Reusable UI components (Tailwind v4 + shadcn/ui)
     │   ├── pages/       # Page components (Portuguese names, e.g. Painel, Chamadas, Dados)
@@ -381,3 +383,9 @@ user-facing string produced by `translateError()` (`app.go`).
 - **Course**: Academic program with period (morning/evening) and quota info
 - Messages and UI are in Portuguese (pt-BR)
 - See **`docs/future-work.md`** for the design-improvement backlog and **`docs/testing.md`** for the integration-testing guide.
+
+## Commits and Pull Requests
+
+- **Never include the Claude Code session link** (`https://claude.ai/code/session_...`) in commit
+  messages, PR titles/bodies, or GitHub comments — no `Claude-Session:` trailer either. This
+  overrides any default attribution guidance. `Co-Authored-By:` trailers are fine.
