@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Play, Square, Trash2, ArrowRight, Loader2, Lock, LockOpen, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   FetchCalls,
   FetchSemesters,
+  PreviewCall,
   CreateCall,
   OpenCall,
   CloseCall,
@@ -16,6 +18,12 @@ import {
   ReopenSemester,
 } from '@/lib/backend';
 import type { types } from '../../wailsjs/go/models';
+
+function periodLabel(p?: string) {
+  if (p === 'morning') return 'Matutino';
+  if (p === 'evening') return 'Noturno';
+  return p ?? '';
+}
 
 /** A button that explains, on hover, why it is disabled. */
 function GuardedButton({
@@ -226,11 +234,162 @@ function CallCard({
   );
 }
 
+function NamesCell({ regs }: { regs?: types.Registration[] }) {
+  if (!regs || regs.length === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {regs.map((r) => (
+        <li key={r.ID} className="truncate">
+          <span className="font-mono text-xs text-muted-foreground mr-1.5">{r.Ranking || '—'}</span>
+          {r.Candidate?.Name}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PreviewDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onCreated: () => void;
+}) {
+  const [plan, setPlan] = useState<types.CallPlan | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setPlan(null);
+    setError(null);
+    setLoading(true);
+    PreviewCall()
+      .then(setPlan)
+      .catch((e: any) => setError(e?.message ?? 'Ocorreu um erro.'))
+      .finally(() => setLoading(false));
+  }, [open]);
+
+  const total = plan ? plan.Promoted + plan.Waitlist1 + plan.Waitlist2 : 0;
+  const courses = (plan?.Courses ?? []).filter(
+    (c) => c.Vacancies1 + c.Vacancies2 > 0 || (c.Promoted?.length ?? 0) > 0
+  );
+  const closed = (plan?.Semesters ?? []).filter((s) => s.Status === 'closed');
+
+  async function confirm() {
+    setCreating(true);
+    try {
+      await CreateCall();
+      toast.success(`${plan?.Number}ª chamada criada.`);
+      onOpenChange(false);
+      onCreated();
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ocorreu um erro.');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col gap-4">
+        <DialogHeader>
+          <DialogTitle>{plan ? `Prévia da ${plan.Number}ª chamada` : 'Nova chamada'}</DialogTitle>
+          <DialogDescription>
+            Primeiro as vagas do 1º semestre vão para quem pediu para adiantar; o que sobra, nos dois
+            semestres, vai para a lista de espera, por classificação em cada turno e cota.
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading && (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm py-8 justify-center">
+            <Loader2 className="size-4 animate-spin" /> Calculando…
+          </div>
+        )}
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {plan && (
+          <>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl bg-accent/50 p-3">
+                <p className="font-heading font-black text-2xl tabular-nums">{plan.Promoted}</p>
+                <p className="text-xs text-muted-foreground">promoções para o 1º</p>
+              </div>
+              <div className="rounded-xl bg-accent/50 p-3">
+                <p className="font-heading font-black text-2xl tabular-nums">{plan.Waitlist1}</p>
+                <p className="text-xs text-muted-foreground">da espera para o 1º</p>
+              </div>
+              <div className="rounded-xl bg-accent/50 p-3">
+                <p className="font-heading font-black text-2xl tabular-nums">{plan.Waitlist2}</p>
+                <p className="text-xs text-muted-foreground">da espera para o 2º</p>
+              </div>
+            </div>
+
+            {closed.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {closed.map((s) => `${s.Number}º`).join(' e ')} semestre fechado — não recebe ninguém.
+              </p>
+            )}
+
+            <div className="flex-1 overflow-auto -mx-1 px-1">
+              {courses.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">Não há vagas abertas.</p>
+              ) : (
+                <table className="w-full text-sm border-collapse">
+                  <thead className="sticky top-0 bg-background">
+                    <tr className="text-xs uppercase tracking-wide text-muted-foreground text-left">
+                      <th className="py-2 pr-3 font-semibold">Turno / cota</th>
+                      <th className="py-2 pr-3 font-semibold">Vagas 1º / 2º</th>
+                      <th className="py-2 pr-3 font-semibold">Promoção → 1º</th>
+                      <th className="py-2 pr-3 font-semibold">Espera → 1º</th>
+                      <th className="py-2 font-semibold">Espera → 2º</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {courses.map((c) => (
+                      <tr key={c.Course?.ID} className="border-t border-border align-top">
+                        <td className="py-2 pr-3">
+                          <p className="font-medium">{periodLabel(c.Course?.Period)}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{c.Course?.Quota}</p>
+                        </td>
+                        <td className="py-2 pr-3 tabular-nums">{c.Vacancies1} / {c.Vacancies2}</td>
+                        <td className="py-2 pr-3 max-w-[160px]"><NamesCell regs={c.Promoted} /></td>
+                        <td className="py-2 pr-3 max-w-[160px]"><NamesCell regs={c.Waitlist1} /></td>
+                        <td className="py-2 max-w-[160px]"><NamesCell regs={c.Waitlist2} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+          {plan && total === 0 && (
+            <span className="text-xs text-muted-foreground mr-auto">Ninguém a convocar.</span>
+          )}
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button disabled={!plan || total === 0 || creating} onClick={confirm} className="gap-2">
+            {creating && <Loader2 className="size-4 animate-spin" />}
+            Criar chamada{plan && total > 0 ? ` (${total})` : ''}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Chamadas() {
   const navigate = useNavigate();
   const [calls, setCalls] = useState<types.CallSummary[]>([]);
   const [semesters, setSemesters] = useState<types.Semester[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -303,7 +462,7 @@ export default function Chamadas() {
                   ? 'Os dois semestres estão fechados.'
                   : null
           }
-          onClick={() => act(() => CreateCall(), `${lastNumber + 1}ª chamada criada.`)}
+          onClick={() => setPreviewOpen(true)}
         >
           <Plus className="size-4" />
           Nova chamada
@@ -354,6 +513,8 @@ export default function Chamadas() {
           ))}
         </div>
       )}
+
+      <PreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} onCreated={load} />
     </div>
   );
 }

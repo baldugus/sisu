@@ -373,6 +373,7 @@ Commands orchestrate business logic and transactions. Example flow for `LoadSele
 - Every course must have an **even** total seat count (approved and waitlist files alike): the parser builds seats with `types.NewSeats`, so an odd count fails the import with `types.ErrOddSeatsCount` ("O número total de vagas deve ser par para divisão entre semestres."). This is intentional — odd counts are not auto-split.
 
 **Call creation specifics (`commands/create_call.go`, rule in `allocation/`):**
+- `PreviewCallCommand` and `CreateCallCommand` run the same plan, so the preview is exactly what gets created.
 - Per course: semester-1 vacancies go first to semester-2 students who are enrolled, marked `WantsPromotion`, and were never offered a promotion (`promotion` entries, best ranked first); the remaining semester-1 vacancies, then semester-2 vacancies, go to never-called waitlist registrations (ranking ascending; missing ranking last). A closed semester receives no one. A seat freed by an accepted promotion is only refilled in the **next** call.
 - Promotion offers are answered with `enrolled` (accepted → moves to semester 1) or `declined` (stays in semester 2, never offered again).
 - Returns `ErrOpenCallExists`, `ErrAllSemestersClosed`, `ErrAllCoursesFull` or `ErrNoCandidatesToCall` when nothing can be created.

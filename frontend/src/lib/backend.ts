@@ -82,6 +82,9 @@ export const OpenCall: typeof real.OpenCall = (...a) =>
 export const OpenFileDialog: typeof real.OpenFileDialog = (...a) =>
   hasWails() ? real.OpenFileDialog(...a) : mock.OpenFileDialog(...a);
 
+export const PreviewCall: typeof real.PreviewCall = (...a) =>
+  hasWails() ? real.PreviewCall(...a) : mock.PreviewCall(...a);
+
 export const ReopenSemester: typeof real.ReopenSemester = (...a) =>
   hasWails() ? real.ReopenSemester(...a) : mock.ReopenSemester(...a);
 

@@ -116,6 +116,7 @@ are the canonical shadcn pages. Page shell + header:
   requests with `SetWantsPromotion(callID, registrationID, bool)`; `src/lib/status.ts` maps
   outcomes to the status badges.
 - **Semester** — `Number, Status ("open"|"closed"), ClosedAfterCall?, Seats, Occupied`; always two.
+- **CallPlan** (`PreviewCall`) — who the next call would summon, per course; `CreateCall()` applies it.
 
 ## Conventions
 

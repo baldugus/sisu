@@ -132,6 +132,33 @@ func TestCreateCall_WaitlistFillsSemesterOneFirst(t *testing.T) {
 	testutil.AssertSemesterOccupancy(t, db.Database, 2, 2)
 }
 
+func TestCreateCall_PreviewMatchesCreatedCall(t *testing.T) {
+	db, call1, regs := splitCycle(t)
+
+	testutil.SetOutcome(t, db.Database, call1, regs[1].ID, types.CallEntryOutcomeAbsent)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, true)
+	testutil.CloseCallWithEnrollment(t, db.Database, call1)
+
+	preview := commands.PreviewCallCommand{}
+	plan, err := preview.Execute(db.Database)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(2), plan.Number)
+	require.Len(t, plan.Courses, 1)
+	assert.Equal(t, int32(1), plan.Courses[0].Vacancies1)
+	assert.Equal(t, int32(0), plan.Courses[0].Vacancies2)
+	require.Len(t, plan.Courses[0].Promoted, 1)
+	assert.Equal(t, regs[2].ID, plan.Courses[0].Promoted[0].ID)
+	assert.Empty(t, plan.Courses[0].Waitlist1)
+	assert.Equal(t, int32(1), plan.Total())
+
+	call2 := testutil.CreateCall(t, db.Database)
+	entries := testutil.CallEntries(t, db.Database, call2)
+	require.Len(t, entries, 1)
+	assert.Equal(t, types.CallEntryKindPromotion, entries[0].Entry.Kind)
+	assert.Equal(t, regs[2].ID, entries[0].Entry.RegistrationID)
+}
+
 // TestPromotionFlow walks the promotion rules: a semester-2 student who asked to
 // move up is offered semester 1 before the waitlist; while the offer is pending
 // or declined they stay in semester 2; accepting moves them and frees their
