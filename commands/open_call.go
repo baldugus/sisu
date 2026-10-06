@@ -2,6 +2,8 @@ package commands
 
 import "github.com/baldugus/sisu/database"
 
+// OpenCallCommand reopens a closed call. Undo happens in reverse order, so only
+// the last call can be reopened.
 type OpenCallCommand struct {
 	ID int32
 }

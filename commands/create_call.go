@@ -1,109 +1,153 @@
 package commands
 
 import (
-	"github.com/baldugus/sisu/database"
-	"github.com/baldugus/sisu/types"
+	"fmt"
+
 	"github.com/go-jet/jet/v2/qrm"
+
+	"github.com/baldugus/sisu/allocation"
+	"github.com/baldugus/sisu/database"
+	"github.com/baldugus/sisu/database/.gen/model"
+	"github.com/baldugus/sisu/types"
 )
 
-type CreateCallCommand struct {
-	SemesterID int32
-}
+// CreateCallCommand opens the next call from the waitlist (see package allocation).
+type CreateCallCommand struct{}
 
 func (cmd *CreateCallCommand) Execute(db *database.Database) error {
+	return db.RunInTx(func(tx qrm.DB) error {
+		next, err := planNextCall(db, tx)
+		if err != nil {
+			return err
+		}
+
+		if next.vacancies == 0 {
+			return ErrAllCoursesFull{}
+		}
+
+		if len(next.entries) == 0 {
+			return ErrNoCandidatesToCall{}
+		}
+
+		callID, err := database.CreateCall(tx, &types.Call{
+			Number: next.number,
+			Status: types.CallStatusCalling,
+		})
+		if err != nil {
+			return fmt.Errorf("create call: %w", err)
+		}
+
+		for _, e := range next.entries {
+			e.CallID = callID
+		}
+
+		return database.CreateCallEntries(tx, next.entries)
+	})
+}
+
+// nextCall is what opening the next call would do.
+type nextCall struct {
+	number int32
+	// vacancies is the number of free seats across both semesters.
+	vacancies int32
+	// entries are the entries to insert (without CallID).
+	entries []*types.CallEntry
+}
+
+// planNextCall gathers the allocation input and runs the rule.
+func planNextCall(db *database.Database, tx qrm.DB) (*nextCall, error) {
 	hasOpenCall, err := db.HasOpenCall()
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	if hasOpenCall {
-		return ErrOpenCallExists{}
+		return nil, ErrOpenCallExists{}
 	}
 
 	lastCallNumber, err := db.GetLastCallNumber()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	if lastCallNumber == 0 {
+		return nil, ErrNoCalls{}
+	}
+
+	in, err := allocationInput(db, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	next := &nextCall{number: lastCallNumber + 1}
+
+	for _, r := range allocation.Plan(in) {
+		next.vacancies += r.Vacancies[0] + r.Vacancies[1]
+
+		next.entries = append(next.entries, newEntries(r.Waitlist[0], types.CallEntryKindWaitlist, 1)...)
+		next.entries = append(next.entries, newEntries(r.Waitlist[1], types.CallEntryKindWaitlist, 2)...) //nolint: mnd
+	}
+
+	return next, nil
+}
+
+func allocationInput(db *database.Database, tx qrm.DB) (allocation.Input, error) {
 	courses, err := db.FetchCourses()
 	if err != nil {
-		return err
+		return allocation.Input{}, fmt.Errorf("fetch courses: %w", err)
 	}
 
-	return db.RunInTx(func(tx qrm.DB) error {
-		call := &types.Call{
-			Number:     lastCallNumber + 1,
-			Status:     types.CallStatusCalling,
-			SemesterID: cmd.SemesterID,
+	occupied, err := database.FetchOccupiedSeats(tx)
+	if err != nil {
+		return allocation.Input{}, fmt.Errorf("fetch occupied seats: %w", err)
+	}
+
+	waitlist, err := database.FetchUncalledWaitlist(tx)
+	if err != nil {
+		return allocation.Input{}, fmt.Errorf("fetch waitlist: %w", err)
+	}
+
+	byCourse := make(map[int32]*allocation.Course, len(courses))
+	in := allocation.Input{Courses: make([]allocation.Course, len(courses))}
+
+	for i, c := range courses {
+		in.Courses[i] = allocation.Course{ID: c.ID, SeatsPerSemester: c.Seats.PerSemester()}
+		byCourse[c.ID] = &in.Courses[i]
+	}
+
+	for _, o := range occupied {
+		if c, ok := byCourse[o.CourseID]; ok && o.Semester >= 1 && o.Semester <= 2 {
+			c.Occupied[o.Semester-1] = o.Count
 		}
+	}
 
-		callID, err := database.CreateCall(tx, call)
-		if err != nil {
-			return err
+	for _, r := range waitlist {
+		if c, ok := byCourse[r.CourseID]; ok {
+			c.Waitlist = append(c.Waitlist, toCandidate(r))
 		}
+	}
 
-		totalPromoted := 0
-		totalAvailableSeats := int32(0)
+	return in, nil
+}
 
-		semester, err := database.FetchSemesterByID(tx, cmd.SemesterID)
-		if err != nil {
-			return err
+func toCandidate(r model.Registrations) allocation.Candidate {
+	return allocation.Candidate{
+		RegistrationID: r.ID,
+		Ranking:        r.Ranking,
+		CompositeScore: r.CompositeScore,
+	}
+}
+
+func newEntries(ids []int32, kind types.CallEntryKind, semester int32) []*types.CallEntry {
+	entries := make([]*types.CallEntry, len(ids))
+	for i, id := range ids {
+		entries[i] = &types.CallEntry{
+			RegistrationID: id,
+			Kind:           kind,
+			Semester:       semester,
+			Outcome:        types.CallEntryOutcomePending,
 		}
+	}
 
-		var sem2ID *int32
-		if semester.Number == 1 {
-			sem2, err := database.FetchSemesterByYearAndNumber(tx, semester.Year, 2)
-			if err == nil {
-				sem2ID = &sem2.ID
-			}
-		}
-
-		for _, course := range courses {
-			occupiedSeats, err := database.CountCourseOccupiedSeats(tx, course.ID)
-			if err != nil {
-				return err
-			}
-
-			availableSeats := course.Seats.Total() - occupiedSeats
-			if availableSeats <= 0 {
-				continue
-			}
-
-			totalAvailableSeats += availableSeats
-
-			var promotedIDs []int32
-			if sem2ID != nil {
-				promotedIDs, err = database.FetchPriorityRegistrationsByCourse(tx, course.ID, *sem2ID, availableSeats)
-				if err != nil {
-					return err
-				}
-			}
-
-			remainingSeats := availableSeats - int32(len(promotedIDs))
-			var waitlistedIDs []int32
-			if remainingSeats > 0 {
-				waitlistedIDs, err = database.FetchWaitlistedRegistrationsByCourse(tx, course.ID, remainingSeats)
-				if err != nil {
-					return err
-				}
-			}
-
-			registrationIDs := append(promotedIDs, waitlistedIDs...)
-
-			for _, regID := range registrationIDs {
-				if err := database.AssignRegistrationToCall(tx, regID, callID); err != nil {
-					return err
-				}
-				totalPromoted++
-			}
-		}
-
-		if totalPromoted == 0 {
-			if totalAvailableSeats == 0 {
-				return ErrAllCoursesFull{}
-			}
-			return ErrNoWaitlistedRegistrations{}
-		}
-
-		return nil
-	})
+	return entries
 }

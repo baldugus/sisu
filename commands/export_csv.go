@@ -76,8 +76,9 @@ func toEnrolledRegistrationCSV(detail *types.RegistrationDetail) *types.Enrolled
 		Status:               registrationStatusToPortuguese(reg.Status),
 
 		// Course fields
-		Period: coursePeriodToPortugueseCSV(course.Period),
-		Quota:  course.Quota,
+		Period:   coursePeriodToPortugueseCSV(course.Period),
+		Quota:    course.Quota,
+		Semester: semesterOrZero(reg.Semester),
 	}
 }
 
@@ -105,4 +106,12 @@ func coursePeriodToPortugueseCSV(period types.CoursePeriod) string {
 	default:
 		return period.String()
 	}
+}
+
+func semesterOrZero(semester *int32) int32 {
+	if semester == nil {
+		return 0
+	}
+
+	return *semester
 }

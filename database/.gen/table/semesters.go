@@ -17,10 +17,7 @@ type semestersTable struct {
 	sqlite.Table
 
 	// Columns
-	ID     sqlite.ColumnInteger
-	Year   sqlite.ColumnInteger
 	Number sqlite.ColumnInteger
-	Status sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -62,12 +59,9 @@ func newSemestersTable(schemaName, tableName, alias string) *SemestersTable {
 
 func newSemestersTableImpl(schemaName, tableName, alias string) semestersTable {
 	var (
-		IDColumn       = sqlite.IntegerColumn("id")
-		YearColumn     = sqlite.IntegerColumn("year")
 		NumberColumn   = sqlite.IntegerColumn("number")
-		StatusColumn   = sqlite.StringColumn("status")
-		allColumns     = sqlite.ColumnList{IDColumn, YearColumn, NumberColumn, StatusColumn}
-		mutableColumns = sqlite.ColumnList{YearColumn, NumberColumn, StatusColumn}
+		allColumns     = sqlite.ColumnList{NumberColumn}
+		mutableColumns = sqlite.ColumnList{}
 		defaultColumns = sqlite.ColumnList{}
 	)
 
@@ -75,10 +69,7 @@ func newSemestersTableImpl(schemaName, tableName, alias string) semestersTable {
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:     IDColumn,
-		Year:   YearColumn,
 		Number: NumberColumn,
-		Status: StatusColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

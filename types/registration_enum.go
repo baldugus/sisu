@@ -19,8 +19,6 @@ const (
 	RegistrationStatusAbsent RegistrationStatus = "absent"
 	// RegistrationStatusEnrolled is a RegistrationStatus of type enrolled.
 	RegistrationStatusEnrolled RegistrationStatus = "enrolled"
-	// RegistrationStatusDeclinedPromotion is a RegistrationStatus of type declined_promotion.
-	RegistrationStatusDeclinedPromotion RegistrationStatus = "declined_promotion"
 )
 
 var ErrInvalidRegistrationStatus = errors.New("not a valid RegistrationStatus")
@@ -38,11 +36,10 @@ func (x RegistrationStatus) IsValid() bool {
 }
 
 var _RegistrationStatusValue = map[string]RegistrationStatus{
-	"approved":           RegistrationStatusApproved,
-	"waitlisted":         RegistrationStatusWaitlisted,
-	"absent":             RegistrationStatusAbsent,
-	"enrolled":           RegistrationStatusEnrolled,
-	"declined_promotion": RegistrationStatusDeclinedPromotion,
+	"approved":   RegistrationStatusApproved,
+	"waitlisted": RegistrationStatusWaitlisted,
+	"absent":     RegistrationStatusAbsent,
+	"enrolled":   RegistrationStatusEnrolled,
 }
 
 // ParseRegistrationStatus attempts to convert a string to a RegistrationStatus.

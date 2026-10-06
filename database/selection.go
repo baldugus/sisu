@@ -70,30 +70,6 @@ func CreateSelection(db qrm.DB, selection *types.Selection) (int32, error) {
 	return result.ID, nil
 }
 
-func (d *Database) SelectionHasModifiedRegistrations(kind types.SelectionKind) (bool, error) {
-	stmt := SELECT(
-		Registrations.ID,
-	).FROM(
-		Registrations.
-			INNER_JOIN(Selections, Selections.ID.EQ(Registrations.SelectionID)),
-	).WHERE(
-		Selections.Kind.EQ(String(kind.String())).
-			AND(Registrations.Status.IN(
-				String(types.RegistrationStatusAbsent.String()),
-				String(types.RegistrationStatusEnrolled.String()),
-			)),
-	).LIMIT(1)
-
-	var result []int32
-
-	err := stmt.Query(d.db, &result)
-	if err != nil {
-		return false, err
-	}
-
-	return len(result) > 0, nil
-}
-
 func DeleteSelection(db qrm.DB, kind types.SelectionKind) error {
 	stmt := Selections.DELETE().
 		WHERE(Selections.Kind.EQ(String(kind.String())))
