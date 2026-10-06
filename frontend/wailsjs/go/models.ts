@@ -305,6 +305,8 @@ export namespace types {
 	}
 	export class Semester {
 	    Number: number;
+	    Status: string;
+	    ClosedAfterCall?: number;
 	    Seats: number;
 	    Occupied: number;
 	
@@ -315,6 +317,8 @@ export namespace types {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Number = source["Number"];
+	        this.Status = source["Status"];
+	        this.ClosedAfterCall = source["ClosedAfterCall"];
 	        this.Seats = source["Seats"];
 	        this.Occupied = source["Occupied"];
 	    }

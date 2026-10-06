@@ -16,6 +16,9 @@ export const Backup: typeof real.Backup = (...a) =>
 export const CloseCall: typeof real.CloseCall = (...a) =>
   hasWails() ? real.CloseCall(...a) : mock.CloseCall(...a);
 
+export const CloseSemester: typeof real.CloseSemester = (...a) =>
+  hasWails() ? real.CloseSemester(...a) : mock.CloseSemester(...a);
+
 export const CreateCall: typeof real.CreateCall = (...a) =>
   hasWails() ? real.CreateCall(...a) : mock.CreateCall(...a);
 
@@ -78,6 +81,9 @@ export const OpenCall: typeof real.OpenCall = (...a) =>
 
 export const OpenFileDialog: typeof real.OpenFileDialog = (...a) =>
   hasWails() ? real.OpenFileDialog(...a) : mock.OpenFileDialog(...a);
+
+export const ReopenSemester: typeof real.ReopenSemester = (...a) =>
+  hasWails() ? real.ReopenSemester(...a) : mock.ReopenSemester(...a);
 
 export const Restore: typeof real.Restore = (...a) =>
   hasWails() ? real.Restore(...a) : mock.Restore(...a);

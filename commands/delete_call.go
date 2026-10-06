@@ -37,6 +37,10 @@ func (cmd *DeleteCallCommand) Execute(db *database.Database) error {
 		return ErrCannotDeleteCallWithLaterCalls{}
 	}
 
+	if err := requireNoSemesterClosedSince(db, call.Number); err != nil {
+		return err
+	}
+
 	return db.RunInTx(func(tx qrm.DB) error {
 		return database.DeleteCall(tx, cmd.ID)
 	})

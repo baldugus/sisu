@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Play, Square, Trash2, ArrowRight, Loader2, ArrowUp } from 'lucide-react';
+import { Plus, Play, Square, Trash2, ArrowRight, Loader2, Lock, LockOpen, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -12,6 +12,8 @@ import {
   OpenCall,
   CloseCall,
   DeleteCall,
+  CloseSemester,
+  ReopenSemester,
 } from '@/lib/backend';
 import type { types } from '../../wailsjs/go/models';
 
@@ -33,12 +35,47 @@ function GuardedButton({
   );
 }
 
-function SemesterCard({ semester }: { semester: types.Semester }) {
+function SemesterCard({
+  semester,
+  closeReason,
+  reopenReason,
+  onClose,
+  onReopen,
+}: {
+  semester: types.Semester;
+  closeReason: string | null;
+  reopenReason: string | null;
+  onClose: () => void;
+  onReopen: () => void;
+}) {
+  const closed = semester.Status === 'closed';
   const pct = semester.Seats ? (semester.Occupied / semester.Seats) * 100 : 0;
 
   return (
-    <div className="rounded-2xl border p-4 flex flex-col gap-2 bg-card border-border">
-      <h3 className="font-heading font-bold text-lg">{semester.Number}º semestre</h3>
+    <div className={cn('rounded-2xl border p-4 flex flex-col gap-2', closed ? 'bg-muted/50 border-border' : 'bg-card border-border')}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="font-heading font-bold text-lg">{semester.Number}º semestre</h3>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
+              closed ? 'bg-muted text-muted-foreground' : 'bg-[#EDFAF4] text-[#0D5236]'
+            )}
+          >
+            {closed ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
+            {closed ? `Fechado após a ${semester.ClosedAfterCall}ª chamada` : 'Aberto'}
+          </span>
+        </div>
+        {closed ? (
+          <GuardedButton variant="outline" size="sm" className="h-7 text-xs" reason={reopenReason} onClick={onReopen}>
+            Reabrir
+          </GuardedButton>
+        ) : (
+          <GuardedButton variant="outline" size="sm" className="h-7 text-xs" reason={closeReason} onClick={onClose}>
+            Fechar
+          </GuardedButton>
+        )}
+      </div>
       <div className="flex items-baseline gap-1">
         <span className="font-heading font-black text-2xl tabular-nums">{semester.Occupied}</span>
         <span className="text-sm text-muted-foreground">/ {semester.Seats} vagas ocupadas</span>
@@ -46,6 +83,9 @@ function SemesterCard({ semester }: { semester: types.Semester }) {
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div className="h-full bg-primary" style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
       </div>
+      {closed && (
+        <p className="text-xs text-muted-foreground">Não recebe ninguém nas próximas chamadas.</p>
+      )}
     </div>
   );
 }
@@ -77,6 +117,8 @@ function SemesterSummary({ s }: { s: types.CallSemesterSummary }) {
 function CallCard({
   call,
   isLast,
+  reopenReason,
+  deleteReason,
   onOpen,
   onClose,
   onDetail,
@@ -84,6 +126,8 @@ function CallCard({
 }: {
   call: types.CallSummary;
   isLast: boolean;
+  reopenReason: string | null;
+  deleteReason: string | null;
   onOpen: () => void;
   onClose: () => void;
   onDetail: () => void;
@@ -152,20 +196,21 @@ function CallCard({
               </GuardedButton>
             )}
             {!isCalling && isLast && (
-              <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onOpen}>
+              <GuardedButton variant="outline" size="sm" className="h-8 gap-1.5" reason={reopenReason} onClick={onOpen}>
                 <Play className="size-3.5" /> Reabrir
-              </Button>
+              </GuardedButton>
             )}
             {isCalling && isLast && call.Number > 1 && (
-              <Button
+              <GuardedButton
                 variant="ghost"
                 size="sm"
                 className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                reason={deleteReason}
                 aria-label="Excluir chamada"
                 onClick={onDelete}
               >
                 <Trash2 className="size-3.5" />
-              </Button>
+              </GuardedButton>
             )}
             <Button size="sm" className="h-8 gap-1.5" onClick={onDetail}>
               Gerenciar <ArrowRight className="size-3.5" />
@@ -213,6 +258,29 @@ export default function Chamadas() {
 
   const hasOpenCall = calls.some((c) => c.Status === 'calling');
   const lastNumber = calls.length ? calls[calls.length - 1].Number : 0;
+  const bothClosed = semesters.length > 0 && semesters.every((s) => s.Status === 'closed');
+
+  // A semester closed after call N blocks undoing call N (undo runs in reverse order).
+  const closedSince = (n: number) =>
+    semesters.find((s) => s.ClosedAfterCall != null && s.ClosedAfterCall >= n);
+
+  function closeSemesterReason(): string | null {
+    if (calls.length === 0) return 'Importe a lista de aprovados primeiro.';
+    if (hasOpenCall) return 'Feche a chamada aberta antes de fechar o semestre.';
+    return null;
+  }
+
+  function reopenSemesterReason(s: types.Semester): string | null {
+    if (s.ClosedAfterCall != null && lastNumber > s.ClosedAfterCall) {
+      return `Exclua as chamadas criadas depois do fechamento (a partir da ${s.ClosedAfterCall + 1}ª) antes.`;
+    }
+    return null;
+  }
+
+  function undoReason(call: types.CallSummary): string | null {
+    const s = closedSince(call.Number);
+    return s ? `O ${s.Number}º semestre foi fechado depois desta chamada. Reabra o semestre antes.` : null;
+  }
 
   return (
     <div className="px-6 py-6 h-full overflow-auto">
@@ -231,7 +299,9 @@ export default function Chamadas() {
               ? 'Importe a lista de aprovados primeiro.'
               : hasOpenCall
                 ? 'Feche a chamada aberta antes de criar outra.'
-                : null
+                : bothClosed
+                  ? 'Os dois semestres estão fechados.'
+                  : null
           }
           onClick={() => act(() => CreateCall(), `${lastNumber + 1}ª chamada criada.`)}
         >
@@ -243,7 +313,14 @@ export default function Chamadas() {
       {semesters.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           {semesters.map((s) => (
-            <SemesterCard key={s.Number} semester={s} />
+            <SemesterCard
+              key={s.Number}
+              semester={s}
+              closeReason={closeSemesterReason()}
+              reopenReason={reopenSemesterReason(s)}
+              onClose={() => act(() => CloseSemester(s.Number), `${s.Number}º semestre fechado.`)}
+              onReopen={() => act(() => ReopenSemester(s.Number), `${s.Number}º semestre reaberto.`)}
+            />
           ))}
         </div>
       )}
@@ -267,6 +344,8 @@ export default function Chamadas() {
               key={call.ID}
               call={call}
               isLast={i === calls.length - 1}
+              reopenReason={undoReason(call)}
+              deleteReason={undoReason(call)}
               onDetail={() => navigate(`/chamadas/${call.ID}`)}
               onOpen={() => act(() => OpenCall(call.ID), `${call.Number}ª chamada reaberta.`)}
               onClose={() => act(() => CloseCall(call.ID), `${call.Number}ª chamada fechada.`)}

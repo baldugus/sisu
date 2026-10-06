@@ -64,14 +64,26 @@ func translateError(err error) error {
 		return errors.New("Não é possível criar nova chamada enquanto outra está aberta.")
 	case errors.As(err, &commands.ErrNoCandidatesToCall{}):
 		return errors.New("Não há candidatos para convocar: nenhum pedido de adiantamento nem ninguém na lista de espera para as vagas abertas.")
+	case errors.As(err, &commands.ErrAllSemestersClosed{}):
+		return errors.New("Os dois semestres estão fechados.")
 	case errors.As(err, &commands.ErrNoCalls{}):
 		return errors.New("Importe a lista de aprovados antes.")
 	case errors.As(err, &commands.ErrCallNotFound{}):
 		return errors.New("Chamada não encontrada.")
 	case errors.As(err, &commands.ErrCannotDeleteFirstCall{}):
 		return errors.New("A primeira chamada só pode ser removida excluindo a lista de aprovados.")
+	case errors.As(err, &commands.ErrSemesterClosedAfterCall{}):
+		return errors.New("Um semestre foi fechado depois desta chamada. Reabra o semestre antes.")
 	case errors.As(err, &commands.ErrInvalidSemester{}):
 		return errors.New("Semestre inválido.")
+	case errors.As(err, &commands.ErrSemesterAlreadyClosed{}):
+		return errors.New("O semestre já está fechado.")
+	case errors.As(err, &commands.ErrSemesterNotClosed{}):
+		return errors.New("O semestre não está fechado.")
+	case errors.As(err, &commands.ErrCannotReopenSemesterWithLaterCalls{}):
+		return errors.New("Não é possível reabrir o semestre enquanto existem chamadas criadas depois do fechamento.")
+	case errors.As(err, &commands.ErrCannotCloseSemesterWithOpenCall{}):
+		return errors.New("Feche a chamada aberta antes de fechar o semestre.")
 	case errors.As(err, &commands.ErrPromotionNotAllowed{}):
 		return errors.New("Só alunos do 2º semestre que não faltaram podem pedir adiantamento.")
 	case errors.As(err, &commands.ErrAllCoursesFull{}):
@@ -337,6 +349,26 @@ func (a *App) SetWantsPromotion(callID int32, registrationID int32, wants bool) 
 		RegistrationID: registrationID,
 		WantsPromotion: wants,
 	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return translateError(err)
+	}
+
+	return nil
+}
+
+func (a *App) CloseSemester(number int32) error {
+	cmd := commands.CloseSemesterCommand{Number: number}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return translateError(err)
+	}
+
+	return nil
+}
+
+func (a *App) ReopenSemester(number int32) error {
+	cmd := commands.ReopenSemesterCommand{Number: number}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {
 		return translateError(err)

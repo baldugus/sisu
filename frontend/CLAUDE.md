@@ -115,7 +115,7 @@ are the canonical shadcn pages. Page shell + header:
   Change outcomes with `SetCallEntryOutcome(callID, registrationID, outcome)` and promotion
   requests with `SetWantsPromotion(callID, registrationID, bool)`; `src/lib/status.ts` maps
   outcomes to the status badges.
-- **Semester** — `Number, Seats, Occupied`; always two.
+- **Semester** — `Number, Status ("open"|"closed"), ClosedAfterCall?, Seats, Occupied`; always two.
 
 ## Conventions
 

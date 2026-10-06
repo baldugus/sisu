@@ -1,7 +1,10 @@
 -- Semesters: fixed reference data. Every admission cycle has exactly two
 -- intakes, so both rows are seeded here and never inserted or deleted by the app.
+-- closed_after_call holds the number of the last call when the semester was
+-- closed (NULL = open); a closed semester receives no one in later calls.
 CREATE TABLE semesters (
-  number INTEGER NOT NULL PRIMARY KEY CHECK (number IN (1, 2))
+  number            INTEGER NOT NULL PRIMARY KEY CHECK (number IN (1, 2)),
+  closed_after_call INTEGER DEFAULT NULL
 );
 
 INSERT INTO semesters (number) VALUES (1), (2);

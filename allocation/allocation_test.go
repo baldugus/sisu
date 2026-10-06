@@ -19,9 +19,12 @@ func cands(ids ...int32) []allocation.Candidate {
 }
 
 func TestPlan(t *testing.T) {
+	bothOpen := [2]bool{true, true}
+
 	tests := []struct {
 		name          string
 		course        allocation.Course
+		open          [2]bool
 		wantVacancies [2]int32
 		wantPromoted  []int32
 		wantWaitlist1 []int32
@@ -30,17 +33,20 @@ func TestPlan(t *testing.T) {
 		{
 			name:          "no vacancies calls no one",
 			course:        allocation.Course{SeatsPerSemester: 2, Occupied: [2]int32{2, 2}, Promotion: cands(10), Waitlist: cands(20)},
+			open:          bothOpen,
 			wantVacancies: [2]int32{0, 0},
 		},
 		{
 			name:          "promotion fills semester 1 before the waitlist",
 			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{3, 5}, Promotion: cands(11, 10), Waitlist: cands(20, 21)},
+			open:          bothOpen,
 			wantVacancies: [2]int32{2, 0},
 			wantPromoted:  []int32{10, 11},
 		},
 		{
 			name:          "waitlist fills what promotion leaves, semester 1 first",
 			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{2, 4}, Promotion: cands(10), Waitlist: cands(22, 20, 21, 23)},
+			open:          bothOpen,
 			wantVacancies: [2]int32{3, 1},
 			wantPromoted:  []int32{10},
 			wantWaitlist1: []int32{20, 21},
@@ -49,13 +55,29 @@ func TestPlan(t *testing.T) {
 		{
 			name:          "short waitlist leaves semester 2 empty",
 			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{3, 3}, Waitlist: cands(20, 21, 22)},
+			open:          bothOpen,
 			wantVacancies: [2]int32{2, 2},
 			wantWaitlist1: []int32{20, 21},
 			wantWaitlist2: []int32{22},
 		},
 		{
+			name:          "closed semester 1 gets no promotion nor waitlist",
+			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{3, 4}, Promotion: cands(10), Waitlist: cands(20, 21)},
+			open:          [2]bool{false, true},
+			wantVacancies: [2]int32{0, 1},
+			wantWaitlist2: []int32{20},
+		},
+		{
+			name:          "closed semester 2 still allows promotion out of it",
+			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{4, 3}, Promotion: cands(10), Waitlist: cands(20)},
+			open:          [2]bool{true, false},
+			wantVacancies: [2]int32{1, 0},
+			wantPromoted:  []int32{10},
+		},
+		{
 			name:          "overbooked semester reports zero vacancies",
 			course:        allocation.Course{SeatsPerSemester: 2, Occupied: [2]int32{3, 1}, Waitlist: cands(20)},
+			open:          bothOpen,
 			wantVacancies: [2]int32{0, 1},
 			wantWaitlist2: []int32{20},
 		},
@@ -63,7 +85,7 @@ func TestPlan(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := allocation.Plan(allocation.Input{Courses: []allocation.Course{tt.course}})
+			got := allocation.Plan(allocation.Input{Courses: []allocation.Course{tt.course}, Open: tt.open})
 
 			assert.Len(t, got, 1)
 			assert.Equal(t, tt.wantVacancies, got[0].Vacancies)

@@ -6,6 +6,8 @@ export function Backup(arg1:string):Promise<void>;
 
 export function CloseCall(arg1:number):Promise<void>;
 
+export function CloseSemester(arg1:number):Promise<void>;
+
 export function CreateCall():Promise<void>;
 
 export function DeleteApprovedSelection():Promise<void>;
@@ -47,6 +49,8 @@ export function LoadWaitlistSelection(arg1:number,arg2:string):Promise<void>;
 export function OpenCall(arg1:number):Promise<void>;
 
 export function OpenFileDialog(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function ReopenSemester(arg1:number):Promise<void>;
 
 export function Restore(arg1:string):Promise<void>;
 

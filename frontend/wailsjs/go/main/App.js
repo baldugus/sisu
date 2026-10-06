@@ -10,6 +10,10 @@ export function CloseCall(arg1) {
   return window['go']['main']['App']['CloseCall'](arg1);
 }
 
+export function CloseSemester(arg1) {
+  return window['go']['main']['App']['CloseSemester'](arg1);
+}
+
 export function CreateCall() {
   return window['go']['main']['App']['CreateCall']();
 }
@@ -92,6 +96,10 @@ export function OpenCall(arg1) {
 
 export function OpenFileDialog(arg1, arg2, arg3) {
   return window['go']['main']['App']['OpenFileDialog'](arg1, arg2, arg3);
+}
+
+export function ReopenSemester(arg1) {
+  return window['go']['main']['App']['ReopenSemester'](arg1);
 }
 
 export function Restore(arg1) {
