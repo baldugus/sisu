@@ -8,7 +8,7 @@ require (
 	github.com/gen2brain/go-fitz v1.28.2
 	github.com/go-jet/jet/v2 v2.15.0
 	github.com/gocarina/gocsv v0.0.0-20230616125104-99d496ca653d
-	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/johnfercher/maroto/v2 v2.4.2
 	github.com/stretchr/testify v1.11.1
