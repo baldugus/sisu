@@ -22,6 +22,9 @@ const PERIODS = [
   { label: 'Noturno',  value: 'evening' },
 ] as const;
 
+const SEMESTERS = [1, 2] as const;
+type SemesterNumber = typeof SEMESTERS[number];
+
 const REPORT_TYPES = [
   { key: 'website',    label: 'Website',    desc: 'Lista de convocados para publicação' },
   { key: 'enrollment', label: 'Convocados', desc: 'Relatório de convocação oficial' },
@@ -75,6 +78,7 @@ export default function Relatorios() {
   const [info, setInfo] = useState<SelectionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [semester, setSemester] = useState<SemesterNumber>(1);
 
   useEffect(() => {
     async function load() {
@@ -109,15 +113,15 @@ export default function Relatorios() {
 
   async function exportCallReport(type: ReportKey, call: RollCall, period: typeof PERIODS[number]) {
     const key = `${type}-${call.ID}-${period.value}`;
-    const label = `${type}_chamada${call.Number}_${period.label.toLowerCase()}_${info?.year ?? ''}`;
+    const label = `${type}_chamada${call.Number}_${period.label.toLowerCase()}_${semester}sem_${info?.year ?? ''}`;
     await exportReport(
       key,
       (path) => {
-        if (type === 'website') return WebsitePDF(call.ID, period.value, path);
-        if (type === 'enrollment') return EnrollmentPDF(call.ID, period.value, path);
-        return EmailPDF(call.ID, period.value, path);
+        if (type === 'website') return WebsitePDF(call.ID, period.value, semester, path);
+        if (type === 'enrollment') return EnrollmentPDF(call.ID, period.value, semester, path);
+        return EmailPDF(call.ID, period.value, semester, path);
       },
-      `${REPORT_TYPES.find((r) => r.key === type)?.label} — ${call.Number}ª Chamada (${period.label})`,
+      `${REPORT_TYPES.find((r) => r.key === type)?.label} — ${call.Number}ª Chamada, ${semester}º semestre (${period.label})`,
       `${label}.pdf`
     );
   }
@@ -126,9 +130,9 @@ export default function Relatorios() {
     const key = `teacher-${period.value}`;
     await exportReport(
       key,
-      (path) => TeacherPDF(period.value, path),
-      `Professor — ${period.label}`,
-      `professor_${period.label.toLowerCase()}_${info?.year ?? ''}.pdf`
+      (path) => TeacherPDF(period.value, semester, path),
+      `Professor — ${semester}º semestre (${period.label})`,
+      `professor_${period.label.toLowerCase()}_${semester}sem_${info?.year ?? ''}.pdf`
     );
   }
 
@@ -163,6 +167,27 @@ export default function Relatorios() {
             SISU <span className="font-mono font-bold text-foreground">{info.year}</span>
           </p>
         )}
+      </div>
+
+      <div className="flex items-center gap-3 mb-6">
+        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Semestre</span>
+        <div className="flex gap-1">
+          {SEMESTERS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSemester(s)}
+              className={cn(
+                'px-3 py-1 rounded-full text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                semester === s
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              {s}º semestre
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-muted-foreground">Os relatórios abaixo listam apenas este semestre.</span>
       </div>
 
       {calls.length === 0 ? (
@@ -212,7 +237,7 @@ export default function Relatorios() {
                   </p>
                   <ExportCard
                     label="Professor"
-                    desc="Relatório para professores — todos os matriculados"
+                    desc={`Relatório para professores — matriculados no ${semester}º semestre`}
                     busy={busyKey === `teacher-${period.value}`}
                     onExport={() => exportTeacher(period)}
                   />

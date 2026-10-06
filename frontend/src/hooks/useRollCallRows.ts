@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { RowData } from '@/components/RosterTable';
-import {
-  FetchRegistrationsByCallID,
-  FetchRegistration,
-} from '@/lib/backend';
+import { FetchCallEntries } from '@/lib/backend';
+import { outcomeToStatus, type EntryKind } from '@/lib/status';
 
 function periodLabel(p: string) {
   if (p === 'morning') return 'Matutino';
@@ -11,6 +9,7 @@ function periodLabel(p: string) {
   return p;
 }
 
+/** Rows of a call: one per call entry, with the entry's semester, kind and outcome. */
 export function useRollCallRows(callId: number) {
   const [rows, setRows] = useState<RowData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,26 +20,27 @@ export function useRollCallRows(callId: number) {
     setLoading(true);
     setError(null);
     try {
-      const apps = await FetchRegistrationsByCallID(callId) ?? [];
-      const details = await Promise.all(apps.map((a) => FetchRegistration(a.ID)));
+      const entries = await FetchCallEntries(callId) ?? [];
 
-      const mapped: (RowData | null)[] = details.map((d) => {
-        const reg = d?.Registration;
-        const course = d?.Course;
-        const candidate = reg?.Candidate;
-        if (!reg) return null;
-        return {
+      const data: RowData[] = entries.flatMap((d) => {
+        const reg = d.Registration;
+        const entry = d.Entry;
+        if (!reg || !entry) return [];
+        const candidate = reg.Candidate;
+        return [{
           ID: reg.ID,
           Name: candidate?.Name ?? '',
           CPF: candidate?.CPF ?? '',
-          Period: periodLabel(course?.Period ?? ''),
-          Quota: course?.Quota ?? '',
-          Status: reg.Status?.toUpperCase() ?? 'APPROVED',
+          Email: candidate?.Email ?? '',
+          Period: periodLabel(d.Course?.Period ?? ''),
+          Quota: d.Course?.Quota ?? '',
+          Status: outcomeToStatus(entry.Outcome),
           EnrollmentID: reg.EnrollmentID,
           Ranking: reg.Ranking,
-        };
+          Semester: entry.Semester,
+          Kind: entry.Kind as EntryKind,
+        }];
       });
-      const data: RowData[] = mapped.filter((r): r is RowData => r !== null);
 
       setRows(data);
     } catch (e: any) {

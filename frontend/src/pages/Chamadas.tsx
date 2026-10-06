@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Play, Square, Trash2, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -12,11 +13,56 @@ import {
   CloseCall,
   DeleteCall,
 } from '@/lib/backend';
+import type { types } from '../../wailsjs/go/models';
 
-interface RollCall {
-  ID: number;
-  Number: number;
-  Status: string;
+/** A button that explains, on hover, why it is disabled. */
+function GuardedButton({
+  reason,
+  children,
+  ...props
+}: React.ComponentProps<typeof Button> & { reason?: string | null }) {
+  const button = <Button {...props} disabled={props.disabled || !!reason}>{children}</Button>;
+  if (!reason) return button;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0}>{button}</span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{reason}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SemesterCard({ semester }: { semester: types.Semester }) {
+  const pct = semester.Seats ? (semester.Occupied / semester.Seats) * 100 : 0;
+
+  return (
+    <div className="rounded-2xl border p-4 flex flex-col gap-2 bg-card border-border">
+      <h3 className="font-heading font-bold text-lg">{semester.Number}º semestre</h3>
+      <div className="flex items-baseline gap-1">
+        <span className="font-heading font-black text-2xl tabular-nums">{semester.Occupied}</span>
+        <span className="text-sm text-muted-foreground">/ {semester.Seats} vagas ocupadas</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className="h-full bg-primary" style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function SemesterSummary({ s }: { s: types.CallSemesterSummary }) {
+  const parts: string[] = [];
+  if (s.Initial) parts.push(`${s.Initial} da lista de aprovados`);
+  if (s.Waitlist) parts.push(`${s.Waitlist} da lista de espera`);
+
+  return (
+    <div className="text-xs">
+      <span className="font-semibold text-foreground">{s.Semester}º sem.:</span>{' '}
+      <span className="text-muted-foreground">
+        {parts.length === 0 ? 'ninguém' : parts.join(' · ')}
+      </span>
+    </div>
+  );
 }
 
 function CallCard({
@@ -25,19 +71,16 @@ function CallCard({
   onOpen,
   onClose,
   onDetail,
-  canDelete,
   onDelete,
 }: {
-  call: RollCall;
+  call: types.CallSummary;
   isLast: boolean;
   onOpen: () => void;
   onClose: () => void;
   onDetail: () => void;
-  canDelete: boolean;
   onDelete: () => void;
 }) {
-  const isCalling = call.Status === 'CALLING';
-  const isDone = call.Status === 'DONE';
+  const isCalling = call.Status === 'calling';
 
   return (
     <div className="flex gap-5">
@@ -68,31 +111,50 @@ function CallCard({
             <h3 className="font-heading font-bold text-xl mb-1">
               {call.Number}ª Chamada
             </h3>
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full',
-                isCalling ? 'bg-[#FFF8E1] text-[#7A4500]' : 'bg-muted text-muted-foreground'
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full',
+                  isCalling ? 'bg-[#FFF8E1] text-[#7A4500]' : 'bg-muted text-muted-foreground'
+                )}
+              >
+                <span className={cn('w-1.5 h-1.5 rounded-full', isCalling ? 'bg-[#E0A100]' : 'bg-muted-foreground')} />
+                {isCalling ? 'Aberta' : 'Fechada'}
+              </span>
+              {isCalling && call.Pending > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {call.Pending} pendente{call.Pending !== 1 ? 's' : ''}
+                </span>
               )}
-            >
-              <span className={cn('w-1.5 h-1.5 rounded-full', isCalling ? 'bg-[#E0A100]' : 'bg-muted-foreground')} />
-              {isCalling ? 'Aberta' : isDone ? 'Fechada' : call.Status}
-            </span>
+            </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2">
             {isCalling && (
-              <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onClose}>
+              <GuardedButton
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5"
+                reason={call.Pending > 0 ? 'Registre matrícula ou falta de todos antes de fechar.' : null}
+                onClick={onClose}
+              >
                 <Square className="size-3.5" /> Fechar
-              </Button>
+              </GuardedButton>
             )}
-            {isDone && (
+            {!isCalling && isLast && (
               <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onOpen}>
                 <Play className="size-3.5" /> Reabrir
               </Button>
             )}
-            {canDelete && isLast && (
-              <Button variant="ghost" size="sm" className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={onDelete}>
+            {isCalling && isLast && call.Number > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                aria-label="Excluir chamada"
+                onClick={onDelete}
+              >
                 <Trash2 className="size-3.5" />
               </Button>
             )}
@@ -101,6 +163,10 @@ function CallCard({
             </Button>
           </div>
         </div>
+
+        <div className="mt-3 flex flex-col gap-0.5">
+          {(call.Semesters ?? []).map((s) => <SemesterSummary key={s.Semester} s={s} />)}
+        </div>
       </div>
     </div>
   );
@@ -108,19 +174,16 @@ function CallCard({
 
 export default function Chamadas() {
   const navigate = useNavigate();
-  const [calls, setCalls] = useState<RollCall[]>([]);
+  const [calls, setCalls] = useState<types.CallSummary[]>([]);
+  const [semesters, setSemesters] = useState<types.Semester[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const raw = await FetchCalls() ?? [];
-      setCalls(raw.map((c) => ({
-        ID: c.ID,
-        Number: c.Number,
-        Status: c.Status?.toUpperCase?.() ?? 'DONE',
-      })));
+      const [c, s] = await Promise.all([FetchCalls(), FetchSemesters()]);
+      setCalls(c ?? []);
+      setSemesters(s ?? []);
     } finally {
       setLoading(false);
     }
@@ -128,41 +191,19 @@ export default function Chamadas() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function act(fn: (...args: any[]) => Promise<any>, successMsg: string) {
-    setBusy(true);
+  async function act(fn: () => Promise<any>, successMsg: string) {
     try {
       await fn();
-      await load();
       toast.success(successMsg);
     } catch (e: any) {
       toast.error(e?.message ?? 'Ocorreu um erro.');
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCreateRollCall() {
-    setBusy(true);
-    try {
-      const semesters = await FetchSemesters() ?? [];
-      // SemesterStatus serializes via MarshalText → runtime value is the string "open"
-      const openSemester = semesters.find((s) => (s.Status as unknown as string) === 'open');
-      if (!openSemester) {
-        toast.error('Nenhum semestre aberto encontrado.');
-        return;
-      }
-      await CreateCall(openSemester.ID);
       await load();
-      toast.success('Nova chamada criada.');
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Ocorreu um erro.');
-    } finally {
-      setBusy(false);
     }
   }
 
-  const hasOpenCall = calls.some((c) => c.Status === 'CALLING');
-  const lastCall = calls[calls.length - 1];
+  const hasOpenCall = calls.some((c) => c.Status === 'calling');
+  const lastNumber = calls.length ? calls[calls.length - 1].Number : 0;
 
   return (
     <div className="px-6 py-6 h-full overflow-auto">
@@ -174,17 +215,31 @@ export default function Chamadas() {
             {calls.length} chamada{calls.length !== 1 ? 's' : ''} no ciclo atual
           </p>
         </div>
-        <Button
+        <GuardedButton
           className="gap-2"
-          disabled={busy || hasOpenCall}
-          onClick={handleCreateRollCall}
+          reason={
+            calls.length === 0
+              ? 'Importe a lista de aprovados primeiro.'
+              : hasOpenCall
+                ? 'Feche a chamada aberta antes de criar outra.'
+                : null
+          }
+          onClick={() => act(() => CreateCall(), `${lastNumber + 1}ª chamada criada.`)}
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          <Plus className="size-4" />
           Nova chamada
-        </Button>
+        </GuardedButton>
       </div>
 
-      {loading && (
+      {semesters.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {semesters.map((s) => (
+            <SemesterCard key={s.Number} semester={s} />
+          ))}
+        </div>
+      )}
+
+      {loading && calls.length === 0 && (
         <div className="flex items-center gap-2 text-muted-foreground text-sm py-12 justify-center">
           <Loader2 className="size-4 animate-spin" /> Carregando chamadas…
         </div>
@@ -192,11 +247,11 @@ export default function Chamadas() {
 
       {!loading && calls.length === 0 && (
         <div className="text-center py-16 text-muted-foreground text-sm">
-          Nenhuma chamada criada. Clique em "Nova chamada" para começar.
+          Nenhuma chamada. A 1ª chamada é criada ao importar a lista de aprovados.
         </div>
       )}
 
-      {!loading && calls.length > 0 && (
+      {calls.length > 0 && (
         <div>
           {calls.map((call, i) => (
             <CallCard
@@ -206,7 +261,6 @@ export default function Chamadas() {
               onDetail={() => navigate(`/chamadas/${call.ID}`)}
               onOpen={() => act(() => OpenCall(call.ID), `${call.Number}ª chamada reaberta.`)}
               onClose={() => act(() => CloseCall(call.ID), `${call.Number}ª chamada fechada.`)}
-              canDelete={calls.length > 1}
               onDelete={() => act(() => DeleteCall(call.ID), `${call.Number}ª chamada removida.`)}
             />
           ))}

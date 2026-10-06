@@ -52,8 +52,6 @@ card-wrapped table.
   email is buried in the detail modal.
 - **Status** renders as a colored badge. Status map (label → meaning): `APPROVED` = Convocado(a),
   `ENROLLED` = Matriculado(a), `ABSENT` = Faltoso(a), `WAITLISTED` = Em espera.
-  (`declined_promotion` may appear for Semester-2 candidates who declined promotion — surface it
-  explicitly, e.g. "Declinou promoção".)
 - **Read-only:** no checkboxes, no bulk edit, no status `<select>` in the dialog (dialog shows a
   "Voltar" button only).
 
@@ -64,7 +62,7 @@ card-wrapped table.
   (see the old `CallDataTable` `TABS_3` for exact text).
 - **Status:** Todos / Convocado / Matriculado / Faltoso / Em espera
 - **Search:** matches Nome or CPF (case-insensitive)
-- **Semester:** Todos / 1 / 2 (new — via `Registration.SemesterID`)
+- **Semester:** Todos / 1 / 2 (new — via `Registration.Semester`)
 
 ## Data
 
@@ -84,12 +82,12 @@ Fetch flow (same as today's `ApprovedPage.handleGetData`, plus two extra fields)
   Quota, Status,                // uppercased; default "APPROVED"
   Ranking,
   Email,                        // NEW — detail.Registration.Candidate.Email
-  SemesterID,                   // NEW — detail.Registration.SemesterID (number | null)
+  Semester,                     // NEW — detail.Registration.Semester (number | undefined)
   EnrollmentID,
 }
 ```
 
-> The current `handleGetData` already maps everything except `Email` and `SemesterID` — add those two.
+> The current `handleGetData` already maps everything except `Email` and `Semester` — add those two.
 
 ## Implementation approach
 
