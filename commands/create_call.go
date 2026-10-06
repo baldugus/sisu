@@ -11,7 +11,8 @@ import (
 	"github.com/baldugus/sisu/types"
 )
 
-// CreateCallCommand opens the next call from the waitlist (see package allocation).
+// CreateCallCommand opens the next call: promotions to semester 1 first, then
+// the waitlist (see package allocation).
 type CreateCallCommand struct{}
 
 func (cmd *CreateCallCommand) Execute(db *database.Database) error {
@@ -84,6 +85,7 @@ func planNextCall(db *database.Database, tx qrm.DB) (*nextCall, error) {
 	for _, r := range allocation.Plan(in) {
 		next.vacancies += r.Vacancies[0] + r.Vacancies[1]
 
+		next.entries = append(next.entries, newEntries(r.Promoted, types.CallEntryKindPromotion, 1)...)
 		next.entries = append(next.entries, newEntries(r.Waitlist[0], types.CallEntryKindWaitlist, 1)...)
 		next.entries = append(next.entries, newEntries(r.Waitlist[1], types.CallEntryKindWaitlist, 2)...) //nolint: mnd
 	}
@@ -102,6 +104,11 @@ func allocationInput(db *database.Database, tx qrm.DB) (allocation.Input, error)
 		return allocation.Input{}, fmt.Errorf("fetch occupied seats: %w", err)
 	}
 
+	promotion, err := database.FetchPromotionCandidates(tx)
+	if err != nil {
+		return allocation.Input{}, fmt.Errorf("fetch promotion candidates: %w", err)
+	}
+
 	waitlist, err := database.FetchUncalledWaitlist(tx)
 	if err != nil {
 		return allocation.Input{}, fmt.Errorf("fetch waitlist: %w", err)
@@ -118,6 +125,12 @@ func allocationInput(db *database.Database, tx qrm.DB) (allocation.Input, error)
 	for _, o := range occupied {
 		if c, ok := byCourse[o.CourseID]; ok && o.Semester >= 1 && o.Semester <= 2 {
 			c.Occupied[o.Semester-1] = o.Count
+		}
+	}
+
+	for _, r := range promotion {
+		if c, ok := byCourse[r.CourseID]; ok {
+			c.Promotion = append(c.Promotion, toCandidate(r))
 		}
 	}
 

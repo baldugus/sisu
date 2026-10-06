@@ -89,7 +89,8 @@ func RegistrationsInCall(t *testing.T, db *database.Database, callID int32) []*t
 	return regs
 }
 
-// EnrollAllInCall marks every pending entry of a call as enrolled.
+// EnrollAllInCall marks every pending entry of a call as enrolled (accepting
+// pending promotions).
 func EnrollAllInCall(t *testing.T, db *database.Database, callID int32) {
 	t.Helper()
 
@@ -126,6 +127,20 @@ func SetOutcome(
 
 	err := cmd.Execute(db)
 	require.NoError(t, err, "failed to set outcome %s", outcome)
+}
+
+// SetWantsPromotion records a semester-2 student's request to move to semester 1.
+func SetWantsPromotion(t *testing.T, db *database.Database, callID int32, regID int32, wants bool) {
+	t.Helper()
+
+	cmd := commands.SetWantsPromotionCommand{
+		CallID:         callID,
+		RegistrationID: regID,
+		WantsPromotion: wants,
+	}
+
+	err := cmd.Execute(db)
+	require.NoError(t, err, "failed to set wants promotion")
 }
 
 // latestCallID returns the call of the registration's most recent entry.

@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Play, Square, Trash2, ArrowRight, Loader2 } from 'lucide-react';
+import { Plus, Play, Square, Trash2, ArrowRight, Loader2, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -51,15 +51,24 @@ function SemesterCard({ semester }: { semester: types.Semester }) {
 }
 
 function SemesterSummary({ s }: { s: types.CallSemesterSummary }) {
-  const parts: string[] = [];
+  const parts: ReactNode[] = [];
   if (s.Initial) parts.push(`${s.Initial} da lista de aprovados`);
+  if (s.Promotion) parts.push(
+    <span key="p" className="inline-flex items-center gap-0.5">
+      <ArrowUp className="size-3" /> {s.Promotion} promoç{s.Promotion !== 1 ? 'ões' : 'ão'}
+    </span>
+  );
   if (s.Waitlist) parts.push(`${s.Waitlist} da lista de espera`);
 
   return (
     <div className="text-xs">
       <span className="font-semibold text-foreground">{s.Semester}º sem.:</span>{' '}
       <span className="text-muted-foreground">
-        {parts.length === 0 ? 'ninguém' : parts.join(' · ')}
+        {parts.length === 0
+          ? 'ninguém'
+          : parts.map((p, i) => (
+            <span key={i}>{i > 0 && ' · '}{p}</span>
+          ))}
       </span>
     </div>
   );
@@ -136,7 +145,7 @@ function CallCard({
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5"
-                reason={call.Pending > 0 ? 'Registre matrícula ou falta de todos antes de fechar.' : null}
+                reason={call.Pending > 0 ? 'Registre matrícula, falta ou resposta de todos antes de fechar.' : null}
                 onClick={onClose}
               >
                 <Square className="size-3.5" /> Fechar

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Search, ChevronsUpDown, Loader2, ArrowUpDown, Copy } from 'lucide-react';
+import { Search, ChevronsUpDown, Loader2, ArrowUpDown, Copy, ArrowUp } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,17 +15,19 @@ import { cn } from '@/lib/utils';
 import {
   getStatus,
   STATUSES,
-  ENTRY_STATUSES,
   KIND_LABELS,
   semesterLabel,
+  statusLabelForKind,
   statusToOutcome,
+  statusesForKind,
   type EntryKind,
+  type StatusValue,
 } from '@/lib/status';
 import { copyText } from '@/lib/clipboard';
 import { toast } from 'sonner';
 import { RegistrationDialog } from './RegistrationDialog';
 import { CopyEmailButton } from './CopyEmailButton';
-import { SetCallEntryOutcome } from '@/lib/backend';
+import { SetCallEntryOutcome, SetWantsPromotion } from '@/lib/backend';
 
 export interface RowData {
   ID: number;
@@ -42,6 +44,8 @@ export interface RowData {
   Semester?: number;
   /** Call entry kind (call view only). */
   Kind?: EntryKind;
+  /** Semester-2 student asked to move to semester 1 (call view only). */
+  WantsPromotion?: boolean;
 }
 
 interface RosterTableProps {
@@ -105,6 +109,20 @@ const SEMESTER_OPTIONS = [
   { label: '2º semestre', value: '2' },
 ];
 
+// Bulk actions in a call: outcomes (applied only to rows whose kind allows them)
+// plus the promotion request toggle.
+const BULK_WANTS = '__wants__';
+const BULK_NOT_WANTS = '__not_wants__';
+const BULK_OPTIONS = [
+  ...STATUSES.filter((s) => s.value !== 'WAITLISTED').map((s) => ({ label: s.label, value: s.value as string })),
+  { label: 'Quer adiantar', value: BULK_WANTS },
+  { label: 'Não quer adiantar', value: BULK_NOT_WANTS },
+];
+
+/** Semester-2 student in a call who can ask to move to semester 1. */
+export function canWantPromotion(row: RowData): boolean {
+  return row.Semester === 2 && row.Kind !== 'promotion' && row.Status !== 'ABSENT';
+}
 
 export function RosterTable({
   rows,
@@ -171,7 +189,7 @@ export function RosterTable({
 
   const inCall = callId != null;
   const editable = inCall && hasSelector && !readOnly;
-  const colCount = 7 + (editable ? 1 : 0) + (showContact ? 1 : 0) + (inCall ? 1 : 0);
+  const colCount = 7 + (editable ? 1 : 0) + (showContact ? 1 : 0) + (inCall ? 2 : 0);
 
   const statusOptions = useMemo(() => {
     const present = new Set(rows.map((r) => r.Status));
@@ -230,13 +248,29 @@ export function RosterTable({
   async function applyBulk() {
     if (callId == null) return;
     const selected = filtered.filter((r) => selectedIds.has(r.ID));
-    const outcome = statusToOutcome(bulkStatus);
-    if (!outcome) return;
     setBulkApplying(true);
+    let applied = 0;
+    let skipped = 0;
     try {
       for (const row of selected) {
+        if (bulkStatus === BULK_WANTS || bulkStatus === BULK_NOT_WANTS) {
+          const wants = bulkStatus === BULK_WANTS;
+          if (wants && !canWantPromotion(row)) { skipped++; continue; }
+          if (!!row.WantsPromotion === wants) continue;
+          await SetWantsPromotion(callId, row.ID, wants);
+          applied++;
+          continue;
+        }
+
+        const allowed = statusesForKind(row.Kind).some((s) => s.value === bulkStatus);
+        const outcome = statusToOutcome(bulkStatus);
+        if (!allowed || !outcome) { skipped++; continue; }
         if (row.Status === bulkStatus) continue;
         await SetCallEntryOutcome(callId, row.ID, outcome);
+        applied++;
+      }
+      if (skipped > 0) {
+        toast.warning(`${applied} aplicado${applied !== 1 ? 's' : ''}; ${skipped} ignorado${skipped !== 1 ? 's' : ''} (não se aplica ao tipo de convocação).`);
       }
       setSelectedIds(new Set());
     } catch (e: any) {
@@ -244,6 +278,16 @@ export function RosterTable({
     } finally {
       setBulkApplying(false);
       onRefresh?.();
+    }
+  }
+
+  async function toggleWants(row: RowData) {
+    if (callId == null) return;
+    try {
+      await SetWantsPromotion(callId, row.ID, !row.WantsPromotion);
+      onRefresh?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ocorreu um erro.');
     }
   }
 
@@ -391,6 +435,11 @@ export function RosterTable({
               <th className="px-2 py-3 text-left font-semibold text-xs uppercase tracking-wide text-muted-foreground">
                 Status
               </th>
+              {inCall && (
+                <th className="px-2 py-3 text-left font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                  Quer adiantar
+                </th>
+              )}
             </tr>
             <tr>
               <td colSpan={colCount} className="p-0">
@@ -418,7 +467,9 @@ export function RosterTable({
             )}
             {!loading &&
               filtered.map((row, i) => {
-                const status = getStatus(row.Status);
+                const status = inCall
+                  ? statusLabelForKind(getStatus(row.Status).value as StatusValue, row.Kind)
+                  : getStatus(row.Status);
                 const selected = selectedIds.has(row.ID);
                 return (
                   <tr
@@ -489,7 +540,13 @@ export function RosterTable({
                     </td>
                     {inCall && (
                       <td className="px-2 py-2.5 text-xs whitespace-nowrap">
-                        <span className="text-muted-foreground">{row.Kind ? KIND_LABELS[row.Kind] : '—'}</span>
+                        {row.Kind === 'promotion' ? (
+                          <span className="inline-flex items-center gap-1 font-medium text-primary">
+                            <ArrowUp className="size-3.5" /> Promoção do 2º
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">{row.Kind ? KIND_LABELS[row.Kind] : '—'}</span>
+                        )}
                       </td>
                     )}
                     <td className="px-2 py-2.5">
@@ -504,6 +561,21 @@ export function RosterTable({
                         {status.label}
                       </span>
                     </td>
+                    {inCall && (
+                      <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        {canWantPromotion(row) || row.WantsPromotion ? (
+                          <Checkbox
+                            checked={!!row.WantsPromotion}
+                            disabled={!editable}
+                            onCheckedChange={() => toggleWants(row)}
+                            aria-label="Quer adiantar para o 1º semestre"
+                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -528,7 +600,7 @@ export function RosterTable({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ENTRY_STATUSES.map((s) => (
+                {BULK_OPTIONS.map((s) => (
                   <SelectItem key={s.value} value={s.value} className="text-xs">
                     {s.label}
                   </SelectItem>
@@ -569,6 +641,7 @@ export function RosterTable({
           initialStatus={dialogRow.Status}
           hasSelector={editable}
           callId={callId}
+          kind={dialogRow.Kind}
           onStatusChanged={() => onRefresh?.()}
         />
       )}

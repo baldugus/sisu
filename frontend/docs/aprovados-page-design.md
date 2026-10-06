@@ -52,6 +52,8 @@ card-wrapped table.
   email is buried in the detail modal.
 - **Status** renders as a colored badge. Status map (label → meaning): `APPROVED` = Convocado(a),
   `ENROLLED` = Matriculado(a), `ABSENT` = Faltoso(a), `WAITLISTED` = Em espera.
+  (A declined promotion is not a registration status: it lives on the call entry and is shown as
+  "Recusou" in the call view and in the registration's call history.)
 - **Read-only:** no checkboxes, no bulk edit, no status `<select>` in the dialog (dialog shows a
   "Voltar" button only).
 

@@ -13,4 +13,5 @@ type CallEntries struct {
 	Kind           string
 	Semester       int32
 	Outcome        string
+	WantsPromotion int32
 }

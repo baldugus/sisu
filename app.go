@@ -51,7 +51,7 @@ func translateError(err error) error {
 	case errors.As(err, &commands.ErrCannotDeleteApprovedWithWaitlist{}):
 		return errors.New("Não é possível excluir a lista de aprovados enquanto a lista de espera existir.")
 	case errors.As(err, &commands.ErrSelectionHasModifiedRegistrations{}):
-		return errors.New("Não é possível excluir a seleção depois que a chamada já recebeu matrículas ou faltas.")
+		return errors.New("Não é possível excluir a seleção depois que a chamada já recebeu matrículas, faltas ou pedidos de adiantamento.")
 	case errors.As(err, &commands.ErrCallHasPendingRegistrations{}):
 		return errors.New("Não é possível fechar a chamada com inscrições pendentes.")
 	case errors.As(err, &commands.ErrRegistrationNotFound{}):
@@ -59,11 +59,11 @@ func translateError(err error) error {
 	case errors.As(err, &commands.ErrCallNotOpen{}):
 		return errors.New("A chamada não está aberta.")
 	case errors.As(err, &commands.ErrInvalidStatusTransition{}):
-		return errors.New("Situação inválida.")
+		return errors.New("Situação inválida para este tipo de convocação.")
 	case errors.As(err, &commands.ErrOpenCallExists{}):
 		return errors.New("Não é possível criar nova chamada enquanto outra está aberta.")
 	case errors.As(err, &commands.ErrNoCandidatesToCall{}):
-		return errors.New("Não há candidatos para convocar: ninguém na lista de espera para as vagas abertas.")
+		return errors.New("Não há candidatos para convocar: nenhum pedido de adiantamento nem ninguém na lista de espera para as vagas abertas.")
 	case errors.As(err, &commands.ErrNoCalls{}):
 		return errors.New("Importe a lista de aprovados antes.")
 	case errors.As(err, &commands.ErrCallNotFound{}):
@@ -72,6 +72,8 @@ func translateError(err error) error {
 		return errors.New("A primeira chamada só pode ser removida excluindo a lista de aprovados.")
 	case errors.As(err, &commands.ErrInvalidSemester{}):
 		return errors.New("Semestre inválido.")
+	case errors.As(err, &commands.ErrPromotionNotAllowed{}):
+		return errors.New("Só alunos do 2º semestre que não faltaram podem pedir adiantamento.")
 	case errors.As(err, &commands.ErrAllCoursesFull{}):
 		return errors.New("Todas as vagas de todos os cursos estão ocupadas.")
 	case errors.As(err, &commands.ErrCannotReopenCallWithLaterCalls{}):
@@ -308,7 +310,7 @@ func (a *App) CloseCall(id int32) error {
 }
 
 // SetCallEntryOutcome records a registration's outcome in the open call:
-// "pending", "enrolled" or "absent".
+// "pending", "enrolled", "absent" or, for promotion offers, "declined".
 func (a *App) SetCallEntryOutcome(callID int32, registrationID int32, outcome string) error {
 	parsed, err := types.ParseCallEntryOutcome(outcome)
 	if err != nil {
@@ -319,6 +321,21 @@ func (a *App) SetCallEntryOutcome(callID int32, registrationID int32, outcome st
 		CallID:         callID,
 		RegistrationID: registrationID,
 		Outcome:        parsed,
+	}
+
+	if err := cmd.Execute(a.sisu.database); err != nil {
+		return translateError(err)
+	}
+
+	return nil
+}
+
+// SetWantsPromotion records that a semester-2 student asked to move to semester 1.
+func (a *App) SetWantsPromotion(callID int32, registrationID int32, wants bool) error {
+	cmd := commands.SetWantsPromotionCommand{
+		CallID:         callID,
+		RegistrationID: registrationID,
+		WantsPromotion: wants,
 	}
 
 	if err := cmd.Execute(a.sisu.database); err != nil {

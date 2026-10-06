@@ -246,15 +246,22 @@ func toCallEntryDomain(e *model.CallEntries, callNumber int32) *types.CallEntry 
 		Kind:           types.CallEntryKind(e.Kind),
 		Semester:       e.Semester,
 		Outcome:        types.CallEntryOutcome(e.Outcome),
+		WantsPromotion: e.WantsPromotion != 0,
 	}
 }
 
 func toCallEntryModel(e *types.CallEntry) *model.CallEntries {
+	var wants int32
+	if e.WantsPromotion {
+		wants = 1
+	}
+
 	return &model.CallEntries{
 		CallID:         e.CallID,
 		RegistrationID: e.RegistrationID,
 		Kind:           e.Kind.String(),
 		Semester:       e.Semester,
 		Outcome:        e.Outcome.String(),
+		WantsPromotion: wants,
 	}
 }

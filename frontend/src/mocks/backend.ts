@@ -11,9 +11,9 @@ import * as f from './fixtures';
 const callNumber = (callID: number) => f.mockCalls.find((c) => c.ID === callID)?.Number ?? 0;
 
 function placement(regID: number) {
-  // Latest entry.
+  // Latest entry, ignoring promotion offers that were not accepted.
   return f.mockEntries
-    .filter((e) => e.RegistrationID === regID)
+    .filter((e) => e.RegistrationID === regID && (e.Kind !== 'promotion' || e.Outcome === 'enrolled'))
     .sort((a, b) => callNumber(b.CallID) - callNumber(a.CallID))[0];
 }
 
@@ -60,7 +60,7 @@ export const OpenCall = async (id: number): Promise<void> => {
 };
 // Fixed plan for the next call (the mock does not run the allocation rule).
 const NEXT_CALL = [
-  { RegistrationID: 8, CourseID: 1, Kind: 'waitlist', Semester: 1 },
+  { RegistrationID: 4, CourseID: 1, Kind: 'promotion', Semester: 1 },
 ];
 
 function requireNoOpenCall() {
@@ -74,7 +74,7 @@ export const CreateCall = async (): Promise<void> => {
   const id = Math.max(0, ...f.mockCalls.map((c) => c.ID)) + 1;
   f.mockCalls.push({ ID: id, Number: f.mockCalls.length + 1, Status: 'calling' });
   for (const p of NEXT_CALL) {
-    f.mockEntries.push({ CallID: id, RegistrationID: p.RegistrationID, Kind: p.Kind, Semester: p.Semester, Outcome: 'pending' });
+    f.mockEntries.push({ CallID: id, RegistrationID: p.RegistrationID, Kind: p.Kind, Semester: p.Semester, Outcome: 'pending', WantsPromotion: false });
   }
 };
 export const DeleteCall = async (id: number): Promise<void> => {
@@ -87,6 +87,10 @@ export const DeleteCall = async (id: number): Promise<void> => {
 export const SetCallEntryOutcome = async (callID: number, regID: number, outcome: string): Promise<void> => {
   const e = f.mockEntries.find((x) => x.CallID === callID && x.RegistrationID === regID)!;
   e.Outcome = outcome;
+  if (outcome === 'absent') e.WantsPromotion = false;
+};
+export const SetWantsPromotion = async (callID: number, regID: number, wants: boolean): Promise<void> => {
+  f.mockEntries.find((x) => x.CallID === callID && x.RegistrationID === regID)!.WantsPromotion = wants;
 };
 export const DeleteApprovedSelection = async (): Promise<void> => {};
 export const DeleteWaitlistSelection = async (): Promise<void> => {};
@@ -127,6 +131,7 @@ export const FetchCalls = async () =>
         Semester: s,
         Initial: count(s, 'initial'),
         Waitlist: count(s, 'waitlist'),
+        Promotion: count(s, 'promotion'),
       })),
     });
   });

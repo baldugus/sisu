@@ -90,7 +90,8 @@ regs := testutil.RegistrationsInCall(t, db.Database, callID) // best ranked firs
 entries := testutil.CallEntries(t, db.Database, callID)
 
 // Record outcomes in a specific call
-testutil.SetOutcome(t, db.Database, callID, regID, types.CallEntryOutcomeAbsent)
+testutil.SetOutcome(t, db.Database, callID, regID, types.CallEntryOutcomeDeclined)
+testutil.SetWantsPromotion(t, db.Database, callID, regID, true)
 
 // Shortcuts acting on the registration's latest call entry
 testutil.EnrollRegistration(t, db.Database, regID)
@@ -133,7 +134,7 @@ Pre-created CSV files for testing:
 - **approved_split.csv** - Same students with 4 morning seats, so morning ranking 3 lands in Semester 2
 - **approved_odd_seats.csv** - Same students with 15 evening seats, for the odd-seat-count error
 - **waitlist_small.csv** - 3 waitlisted students
-- **approved_promotion.csv** - 4 approved students in one course with 4 seats (ranks 1-2 → semester 1, 3-4 → semester 2); use it to exercise semester-specific vacancies
+- **approved_promotion.csv** - 4 approved students in one course with 4 seats (ranks 1-2 → semester 1, 3-4 → semester 2); use it to exercise promotions and semester-specific vacancies
 - **waitlist_promotion.csv** - 4 waitlisted students for that course (ranks 5-8)
 - **invalid_missing_fields.csv** - Malformed CSV for error testing
 

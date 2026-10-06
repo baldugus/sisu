@@ -9,6 +9,7 @@ import (
 )
 
 // callPDFArgs selects the students of one call, time slot and semester.
+// Promotions appear in the semester-1 list like any other called student.
 type callPDFArgs struct {
 	CallID   int32
 	Period   types.CoursePeriod

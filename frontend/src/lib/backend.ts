@@ -88,6 +88,8 @@ export const SaveFileDialog: typeof real.SaveFileDialog = (...a) =>
 export const SetCallEntryOutcome: typeof real.SetCallEntryOutcome = (...a) =>
   hasWails() ? real.SetCallEntryOutcome(...a) : mock.SetCallEntryOutcome(...a);
 
+export const SetWantsPromotion: typeof real.SetWantsPromotion = (...a) =>
+  hasWails() ? real.SetWantsPromotion(...a) : mock.SetWantsPromotion(...a);
 
 export const TeacherPDF: typeof real.TeacherPDF = (...a) =>
   hasWails() ? real.TeacherPDF(...a) : mock.TeacherPDF(...a);

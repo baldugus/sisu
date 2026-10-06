@@ -106,6 +106,10 @@ export function SetCallEntryOutcome(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetCallEntryOutcome'](arg1, arg2, arg3);
 }
 
+export function SetWantsPromotion(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetWantsPromotion'](arg1, arg2, arg3);
+}
+
 export function TeacherPDF(arg1, arg2, arg3) {
   return window['go']['main']['App']['TeacherPDF'](arg1, arg2, arg3);
 }

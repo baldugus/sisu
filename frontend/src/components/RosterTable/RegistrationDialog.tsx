@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCpf } from '@/lib/format';
 import { toast } from 'sonner';
@@ -22,12 +22,13 @@ import {
   getStatus,
   outcomeToStatus,
   semesterLabel,
+  statusLabelForKind,
   statusToOutcome,
-  ENTRY_STATUSES,
+  statusesForKind,
   KIND_LABELS,
-  STATUS_MAP,
   type EntryKind,
   type StatusDef,
+  type StatusValue,
 } from '@/lib/status';
 import { FetchRegistration, SetCallEntryOutcome } from '@/lib/backend';
 import type { types } from '../../../wailsjs/go/models';
@@ -40,6 +41,8 @@ interface RegistrationDialogProps {
   hasSelector: boolean;
   /** Call being edited; outcome changes apply to this call's entry. */
   callId?: number;
+  /** Kind of the entry in that call (promotion offers accept/decline). */
+  kind?: EntryKind;
   onStatusChanged: () => void;
 }
 
@@ -143,7 +146,7 @@ const SCORE_FIELDS: { key: string; label: string }[] = [
 
 function HistoryItem({ entry }: { entry: types.CallEntry }) {
   const kind = entry.Kind as EntryKind;
-  const def = STATUS_MAP[outcomeToStatus(entry.Outcome)];
+  const def = statusLabelForKind(outcomeToStatus(entry.Outcome), kind);
   return (
     <li className="flex items-center gap-3 text-sm">
       <span className="w-7 h-7 rounded-full bg-muted text-muted-foreground font-heading font-black text-xs flex items-center justify-center shrink-0">
@@ -151,8 +154,19 @@ function HistoryItem({ entry }: { entry: types.CallEntry }) {
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-foreground">
-          {KIND_LABELS[kind] ?? kind} · {semesterLabel(entry.Semester)} semestre
+          {kind === 'promotion' ? (
+            <span className="inline-flex items-center gap-1">
+              <ArrowUp className="size-3.5 text-primary" /> Promoção para o 1º semestre
+            </span>
+          ) : (
+            <>
+              {KIND_LABELS[kind] ?? kind} · {semesterLabel(entry.Semester)} semestre
+            </>
+          )}
         </p>
+        {entry.WantsPromotion && (
+          <p className="text-xs text-muted-foreground">Pediu para adiantar para o 1º semestre</p>
+        )}
       </div>
       <StatusPill def={def} />
     </li>
@@ -160,7 +174,7 @@ function HistoryItem({ entry }: { entry: types.CallEntry }) {
 }
 
 export function RegistrationDialog({
-  open, onOpenChange, id, initialStatus, hasSelector, callId, onStatusChanged,
+  open, onOpenChange, id, initialStatus, hasSelector, callId, kind, onStatusChanged,
 }: RegistrationDialogProps) {
   const [detail, setDetail] = useState<Record<string, any>>({});
   const [history, setHistory] = useState<types.CallEntry[]>([]);
@@ -230,7 +244,7 @@ export function RegistrationDialog({
 
   const pendingDef =
     callId != null
-      ? getStatus(pendingStatus)
+      ? statusLabelForKind(getStatus(pendingStatus).value as StatusValue, kind)
       : getStatus(current.status);
 
   return (
@@ -352,7 +366,7 @@ export function RegistrationDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ENTRY_STATUSES.map((s) => (
+                {statusesForKind(kind).map((s) => (
                   <SelectItem key={s.value} value={s.value} className="text-xs">
                     {s.label}
                   </SelectItem>

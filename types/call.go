@@ -19,7 +19,8 @@ type CallSummary struct {
 }
 
 type CallSemesterSummary struct {
-	Semester int32
-	Initial  int32
-	Waitlist int32
+	Semester  int32
+	Initial   int32
+	Waitlist  int32
+	Promotion int32
 }
