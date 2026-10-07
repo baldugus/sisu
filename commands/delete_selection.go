@@ -80,6 +80,9 @@ func (cmd *DeleteSelectionCommand) Execute(db *database.Database) error {
 			if err := database.DeleteAllCalls(tx); err != nil {
 				return fmt.Errorf("delete calls: %w", err)
 			}
+			if err := database.ReopenAllSemesters(tx); err != nil {
+				return fmt.Errorf("reopen semesters: %w", err)
+			}
 		} else {
 			// Only delete waitlist-specific data, preserve approved selection data
 			// Get candidate IDs for this selection

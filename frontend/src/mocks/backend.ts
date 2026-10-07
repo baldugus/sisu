@@ -40,6 +40,8 @@ function semesters(): types.Semester[] {
     const occupied = f.mockRegistrations.filter((r) => registration(r.ID).Semester === s.Number).length;
     return types.Semester.createFrom({
       Number: s.Number,
+      Status: s.ClosedAfterCall ? 'closed' : 'open',
+      ClosedAfterCall: s.ClosedAfterCall,
       Seats: seats,
       Occupied: occupied,
     });
@@ -57,6 +59,12 @@ export const CloseCall = async (id: number): Promise<void> => {
 };
 export const OpenCall = async (id: number): Promise<void> => {
   f.mockCalls.find((c) => c.ID === id)!.Status = 'calling';
+};
+export const CloseSemester = async (n: number): Promise<void> => {
+  f.mockSemesters[n - 1].ClosedAfterCall = f.mockCalls.length;
+};
+export const ReopenSemester = async (n: number): Promise<void> => {
+  f.mockSemesters[n - 1].ClosedAfterCall = undefined;
 };
 // Fixed plan for the next call (the mock does not run the allocation rule).
 const NEXT_CALL = [

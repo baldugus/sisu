@@ -49,7 +49,7 @@ func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 // nextCall is what opening the next call would do.
 type nextCall struct {
 	number int32
-	// vacancies is the number of free seats across both semesters.
+	// vacancies is the number of free seats across open semesters.
 	vacancies int32
 	// entries are the entries to insert (without CallID).
 	entries []*types.CallEntry
@@ -75,7 +75,21 @@ func planNextCall(db *database.Database, tx qrm.DB) (*nextCall, error) {
 		return nil, ErrNoCalls{}
 	}
 
-	in, err := allocationInput(db, tx)
+	semesters, err := database.FetchSemesters(tx)
+	if err != nil {
+		return nil, fmt.Errorf("fetch semesters: %w", err)
+	}
+
+	var open [2]bool
+	for _, s := range semesters {
+		open[s.Number-1] = s.Status == types.SemesterStatusOpen
+	}
+
+	if !open[0] && !open[1] {
+		return nil, ErrAllSemestersClosed{}
+	}
+
+	in, err := allocationInput(db, tx, open)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +107,7 @@ func planNextCall(db *database.Database, tx qrm.DB) (*nextCall, error) {
 	return next, nil
 }
 
-func allocationInput(db *database.Database, tx qrm.DB) (allocation.Input, error) {
+func allocationInput(db *database.Database, tx qrm.DB, open [2]bool) (allocation.Input, error) {
 	courses, err := db.FetchCourses()
 	if err != nil {
 		return allocation.Input{}, fmt.Errorf("fetch courses: %w", err)
@@ -115,7 +129,7 @@ func allocationInput(db *database.Database, tx qrm.DB) (allocation.Input, error)
 	}
 
 	byCourse := make(map[int32]*allocation.Course, len(courses))
-	in := allocation.Input{Courses: make([]allocation.Course, len(courses))}
+	in := allocation.Input{Open: open, Courses: make([]allocation.Course, len(courses))}
 
 	for i, c := range courses {
 		in.Courses[i] = allocation.Course{ID: c.ID, SeatsPerSemester: c.Seats.PerSemester()}

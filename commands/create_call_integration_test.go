@@ -236,8 +236,15 @@ func TestUndoToImport(t *testing.T) {
 	testutil.CloseCallWithEnrollment(t, db.Database, call2) // accepts the promotion
 	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(1))
 
+	closeSem := commands.CloseSemesterCommand{Number: 1}
+	require.NoError(t, closeSem.Execute(db.Database))
+
 	// Undo, most recent action first.
 	reopenCall := commands.OpenCallCommand{ID: call2}
+	testutil.AssertErrorType(t, reopenCall.Execute(db.Database), commands.ErrSemesterClosedAfterCall{})
+
+	reopenSem := commands.ReopenSemesterCommand{Number: 1}
+	require.NoError(t, reopenSem.Execute(db.Database))
 	require.NoError(t, reopenCall.Execute(db.Database))
 
 	deleteCall := commands.DeleteCallCommand{ID: call2}

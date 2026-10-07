@@ -8,5 +8,6 @@
 package model
 
 type Semesters struct {
-	Number int32 `sql:"primary_key"`
+	Number          int32 `sql:"primary_key"`
+	ClosedAfterCall *int32
 }

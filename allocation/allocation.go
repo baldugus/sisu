@@ -9,7 +9,7 @@
 //  2. The remaining semester 1 vacancies, then the semester 2 vacancies, are
 //     filled from the waitlist, best ranked first.
 //
-// Seats freed by a promotion only become
+// A closed semester receives no one. Seats freed by a promotion only become
 // available in the next call, once the promotion is accepted, so a student who
 // declines never leaves semester 2 overbooked.
 package allocation
@@ -42,12 +42,14 @@ type Course struct {
 // Input is everything the rule needs.
 type Input struct {
 	Courses []Course
+	// Open is indexed by semester - 1.
+	Open [2]bool
 }
 
 // CourseResult is who gets called for one course.
 type CourseResult struct {
 	CourseID int32
-	// Vacancies is indexed by semester - 1.
+	// Vacancies is indexed by semester - 1; closed semesters report 0.
 	Vacancies [2]int32
 	// Promoted are offered a seat in semester 1.
 	Promoted []int32
@@ -65,16 +67,20 @@ func Plan(in Input) []CourseResult {
 	results := make([]CourseResult, len(in.Courses))
 
 	for i, course := range in.Courses {
-		results[i] = planCourse(course)
+		results[i] = planCourse(course, in.Open)
 	}
 
 	return results
 }
 
-func planCourse(course Course) CourseResult {
+func planCourse(course Course, open [2]bool) CourseResult {
 	result := CourseResult{CourseID: course.ID}
 
 	for s := range 2 {
+		if !open[s] {
+			continue
+		}
+
 		result.Vacancies[s] = max(0, course.SeatsPerSemester-course.Occupied[s])
 	}
 

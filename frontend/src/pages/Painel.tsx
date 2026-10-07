@@ -210,7 +210,7 @@ export default function Painel() {
             key={s.Number}
             label={`${s.Number}º semestre`}
             value={`${s.Occupied} / ${s.Seats}`}
-            sub="vagas ocupadas"
+            sub={`vagas ocupadas${s.Status === 'closed' ? ' · fechado' : ''}`}
             progress={s.Seats ? (s.Occupied / s.Seats) * 100 : 0}
           />
         ))}

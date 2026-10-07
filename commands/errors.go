@@ -108,10 +108,22 @@ func (e ErrCannotDeleteFirstCall) Error() string {
 	return "the first call can only be removed by deleting the approved selection"
 }
 
+type ErrSemesterClosedAfterCall struct{}
+
+func (e ErrSemesterClosedAfterCall) Error() string {
+	return "a semester was closed after this call; reopen it first"
+}
+
 type ErrNoCandidatesToCall struct{}
 
 func (e ErrNoCandidatesToCall) Error() string {
 	return "no one to call: no promotion requests nor waitlisted registrations for the open seats"
+}
+
+type ErrAllSemestersClosed struct{}
+
+func (e ErrAllSemestersClosed) Error() string {
+	return "both semesters are closed"
 }
 
 type ErrNoCalls struct{}
@@ -124,6 +136,30 @@ type ErrInvalidSemester struct{}
 
 func (e ErrInvalidSemester) Error() string {
 	return "semester must be 1 or 2"
+}
+
+type ErrSemesterAlreadyClosed struct{}
+
+func (e ErrSemesterAlreadyClosed) Error() string {
+	return "semester is already closed"
+}
+
+type ErrSemesterNotClosed struct{}
+
+func (e ErrSemesterNotClosed) Error() string {
+	return "semester is not closed"
+}
+
+type ErrCannotReopenSemesterWithLaterCalls struct{}
+
+func (e ErrCannotReopenSemesterWithLaterCalls) Error() string {
+	return "cannot reopen a semester while calls exist after its closure"
+}
+
+type ErrCannotCloseSemesterWithOpenCall struct{}
+
+func (e ErrCannotCloseSemesterWithOpenCall) Error() string {
+	return "cannot close a semester while a call is open"
 }
 
 type ErrPromotionNotAllowed struct{}

@@ -94,7 +94,10 @@ export const mockEntries = [
   { CallID: 2, RegistrationID: 9, Kind: 'waitlist', Semester: 1, Outcome: 'pending', WantsPromotion: false },
 ];
 
-export const mockSemesters = [{ Number: 1 }, { Number: 2 }];
+export const mockSemesters = [
+  { Number: 1, ClosedAfterCall: undefined as number | undefined },
+  { Number: 2, ClosedAfterCall: undefined as number | undefined },
+];
 
 export const approvedSelection = {
   ID: 1,

@@ -17,7 +17,8 @@ type semestersTable struct {
 	sqlite.Table
 
 	// Columns
-	Number sqlite.ColumnInteger
+	Number          sqlite.ColumnInteger
+	ClosedAfterCall sqlite.ColumnInteger
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -59,17 +60,19 @@ func newSemestersTable(schemaName, tableName, alias string) *SemestersTable {
 
 func newSemestersTableImpl(schemaName, tableName, alias string) semestersTable {
 	var (
-		NumberColumn   = sqlite.IntegerColumn("number")
-		allColumns     = sqlite.ColumnList{NumberColumn}
-		mutableColumns = sqlite.ColumnList{}
-		defaultColumns = sqlite.ColumnList{}
+		NumberColumn          = sqlite.IntegerColumn("number")
+		ClosedAfterCallColumn = sqlite.IntegerColumn("closed_after_call")
+		allColumns            = sqlite.ColumnList{NumberColumn, ClosedAfterCallColumn}
+		mutableColumns        = sqlite.ColumnList{ClosedAfterCallColumn}
+		defaultColumns        = sqlite.ColumnList{ClosedAfterCallColumn}
 	)
 
 	return semestersTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		Number: NumberColumn,
+		Number:          NumberColumn,
+		ClosedAfterCall: ClosedAfterCallColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,
