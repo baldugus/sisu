@@ -390,9 +390,3 @@ user-facing string produced by `translateError()` (`app.go`).
 - **Course**: Academic program with period (morning/evening) and quota info
 - Messages and UI are in Portuguese (pt-BR)
 - See **`docs/future-work.md`** for the design-improvement backlog and **`docs/testing.md`** for the integration-testing guide.
-
-## Commits and Pull Requests
-
-- **Never include the Claude Code session link** (`https://claude.ai/code/session_...`) in commit
-  messages, PR titles/bodies, or GitHub comments — no `Claude-Session:` trailer either. This
-  overrides any default attribution guidance. `Co-Authored-By:` trailers are fine.
