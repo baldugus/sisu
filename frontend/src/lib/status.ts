@@ -51,3 +51,44 @@ export function getStatus(raw: string): StatusDef {
   const key = raw?.toUpperCase() as StatusValue;
   return STATUS_MAP[key] ?? STATUS_MAP['APPROVED'];
 }
+
+// ── Call entries ────────────────────────────────────────────────────────────
+// A call entry's outcome ("pending" | "enrolled" | "absent") maps
+// onto the same badges as a registration's status.
+
+export type EntryKind = 'initial' | 'waitlist';
+
+const OUTCOME_TO_STATUS: Record<string, StatusValue> = {
+  pending: 'APPROVED',
+  enrolled: 'ENROLLED',
+  absent: 'ABSENT',
+};
+
+const STATUS_TO_OUTCOME: Record<StatusValue, string | undefined> = {
+  APPROVED: 'pending',
+  ENROLLED: 'enrolled',
+  ABSENT: 'absent',
+  WAITLISTED: undefined,
+};
+
+export function outcomeToStatus(outcome: string): StatusValue {
+  return OUTCOME_TO_STATUS[outcome] ?? 'APPROVED';
+}
+
+export function statusToOutcome(status: string): string | undefined {
+  return STATUS_TO_OUTCOME[status as StatusValue];
+}
+
+/** Outcomes the operator can set on a call entry. */
+export const ENTRY_STATUSES: StatusDef[] = (['APPROVED', 'ENROLLED', 'ABSENT'] as StatusValue[]).map(
+  (v) => STATUS_MAP[v]
+);
+
+export const KIND_LABELS: Record<EntryKind, string> = {
+  initial: 'Inicial',
+  waitlist: 'Lista de espera',
+};
+
+export function semesterLabel(semester?: number | null): string {
+  return semester ? `${semester}º` : '—';
+}

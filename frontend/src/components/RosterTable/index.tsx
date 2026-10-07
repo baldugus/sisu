@@ -12,16 +12,20 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { getStatus, STATUSES } from '@/lib/status';
+import {
+  getStatus,
+  STATUSES,
+  ENTRY_STATUSES,
+  KIND_LABELS,
+  semesterLabel,
+  statusToOutcome,
+  type EntryKind,
+} from '@/lib/status';
 import { copyText } from '@/lib/clipboard';
 import { toast } from 'sonner';
 import { RegistrationDialog } from './RegistrationDialog';
 import { CopyEmailButton } from './CopyEmailButton';
-import {
-  ClearRegistrationStatus,
-  AbsentRegistration,
-  EnrollRegistration,
-} from '@/lib/backend';
+import { SetCallEntryOutcome } from '@/lib/backend';
 
 export interface RowData {
   ID: number;
@@ -33,12 +37,21 @@ export interface RowData {
   Status: string;
   EnrollmentID?: string;
   Ranking?: number;
+  /** Semester the row refers to: the entry's semester in a call, or the
+   *  registration's current semester elsewhere. */
+  Semester?: number;
+  /** Call entry kind (call view only). */
+  Kind?: EntryKind;
 }
 
 interface RosterTableProps {
   rows: RowData[];
   loading?: boolean;
   hasSelector?: boolean;
+  /** Call the rows belong to; enables outcome editing and the call columns. */
+  callId?: number;
+  /** Closed call: rows can be inspected but not changed. */
+  readOnly?: boolean;
   onRefresh?: () => void;
   emptyMessage?: string;
   showKindFilter?: boolean;
@@ -86,19 +99,19 @@ const PERIOD_OPTIONS = [
 
 const QUOTA_ALL = '__all__';
 
-const STATUS_OPTIONS = [
-  { label: 'Todos os status', value: '' },
-  ...STATUSES.map((s) => ({ label: s.label, value: s.value })),
+const SEMESTER_OPTIONS = [
+  { label: 'Todos os semestres', value: '' },
+  { label: '1º semestre', value: '1' },
+  { label: '2º semestre', value: '2' },
 ];
 
-const MUTABLE_STATUSES = STATUSES.filter(
-  (s) => s.value === 'APPROVED' || s.value === 'ABSENT' || s.value === 'ENROLLED'
-);
 
 export function RosterTable({
   rows,
   loading = false,
   hasSelector = false,
+  callId,
+  readOnly = false,
   onRefresh,
   emptyMessage = 'Nenhum candidato encontrado.',
   showKindFilter = false,
@@ -110,6 +123,7 @@ export function RosterTable({
   const [filterPeriod, setFilterPeriod] = useState('');
   const [filterQuota, setFilterQuota] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterSemester, setFilterSemester] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('Ranking');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -133,6 +147,7 @@ export function RosterTable({
     if (filterPeriod) out = out.filter((r) => r.Period === filterPeriod);
     if (filterQuota) out = out.filter((r) => r.Quota === filterQuota);
     if (filterStatus) out = out.filter((r) => r.Status === filterStatus);
+    if (filterSemester) out = out.filter((r) => String(r.Semester ?? '') === filterSemester);
     out = [...out].sort((a, b) => {
       if (sortKey === 'Ranking') {
         const av = a.Ranking ?? Infinity;
@@ -144,7 +159,7 @@ export function RosterTable({
         : b.Name.localeCompare(a.Name, 'pt-BR');
     });
     return out;
-  }, [rows, search, filterPeriod, filterQuota, filterStatus, sortKey, sortAsc]);
+  }, [rows, search, filterPeriod, filterQuota, filterStatus, filterSemester, sortKey, sortAsc]);
 
   const toggleSort = useCallback(
     (key: SortKey) => {
@@ -154,7 +169,17 @@ export function RosterTable({
     [sortKey]
   );
 
-  const colCount = 6 + (hasSelector ? 1 : 0) + (showContact ? 1 : 0);
+  const inCall = callId != null;
+  const editable = inCall && hasSelector && !readOnly;
+  const colCount = 7 + (editable ? 1 : 0) + (showContact ? 1 : 0) + (inCall ? 1 : 0);
+
+  const statusOptions = useMemo(() => {
+    const present = new Set(rows.map((r) => r.Status));
+    return [
+      { label: 'Todos os status', value: '' },
+      ...STATUSES.filter((s) => present.has(s.value)).map((s) => ({ label: s.label, value: s.value as string })),
+    ];
+  }, [rows]);
 
   const filteredEmails = useMemo(() => {
     const seen = new Set<string>();
@@ -203,18 +228,22 @@ export function RosterTable({
   }
 
   async function applyBulk() {
-    const ids = filtered.filter((r) => selectedIds.has(r.ID)).map((r) => r.ID);
+    if (callId == null) return;
+    const selected = filtered.filter((r) => selectedIds.has(r.ID));
+    const outcome = statusToOutcome(bulkStatus);
+    if (!outcome) return;
     setBulkApplying(true);
     try {
-      for (const id of ids) {
-        if (bulkStatus === 'APPROVED') await ClearRegistrationStatus(id);
-        else if (bulkStatus === 'ABSENT') await AbsentRegistration(id);
-        else if (bulkStatus === 'ENROLLED') await EnrollRegistration(id);
+      for (const row of selected) {
+        if (row.Status === bulkStatus) continue;
+        await SetCallEntryOutcome(callId, row.ID, outcome);
       }
       setSelectedIds(new Set());
-      onRefresh?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ocorreu um erro.');
     } finally {
       setBulkApplying(false);
+      onRefresh?.();
     }
   }
 
@@ -306,7 +335,9 @@ export function RosterTable({
             </SelectContent>
           </Select>
 
-          <FilterPills options={STATUS_OPTIONS} value={filterStatus} onChange={setFilterStatus as any} />
+          <FilterPills options={statusOptions} value={filterStatus} onChange={setFilterStatus} />
+
+          <FilterPills options={SEMESTER_OPTIONS} value={filterSemester} onChange={setFilterSemester} />
         </div>
       </div>
 
@@ -315,7 +346,7 @@ export function RosterTable({
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 bg-panel z-10">
             <tr>
-              {hasSelector && (
+              {editable && (
                 <th className="w-8 px-2 py-3 text-left">
                   <Checkbox
                     checked={allSelected}
@@ -349,6 +380,14 @@ export function RosterTable({
               <th className="px-2 py-3 text-left font-semibold text-xs uppercase tracking-wide text-muted-foreground">
                 Cota
               </th>
+              <th className="px-2 py-3 text-left font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                Sem.
+              </th>
+              {inCall && (
+                <th className="px-2 py-3 text-left font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                  Origem
+                </th>
+              )}
               <th className="px-2 py-3 text-left font-semibold text-xs uppercase tracking-wide text-muted-foreground">
                 Status
               </th>
@@ -391,7 +430,7 @@ export function RosterTable({
                     )}
                     style={{ animationDelay: `${Math.min(i * 12, 200)}ms` }}
                   >
-                    {hasSelector && (
+                    {editable && (
                       <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selected}
@@ -445,6 +484,14 @@ export function RosterTable({
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
+                    <td className="px-2 py-2.5 text-sm text-muted-foreground tabular-nums">
+                      {semesterLabel(row.Semester)}
+                    </td>
+                    {inCall && (
+                      <td className="px-2 py-2.5 text-xs whitespace-nowrap">
+                        <span className="text-muted-foreground">{row.Kind ? KIND_LABELS[row.Kind] : '—'}</span>
+                      </td>
+                    )}
                     <td className="px-2 py-2.5">
                       <span
                         className={cn(
@@ -471,17 +518,17 @@ export function RosterTable({
           {rows.length !== filtered.length && ` de ${rows.length}`}
         </span>
 
-        {hasSelector && someSelected && (
+        {editable && someSelected && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
               {selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}
             </span>
             <Select value={bulkStatus} onValueChange={setBulkStatus}>
-              <SelectTrigger className="h-7 text-xs w-36">
+              <SelectTrigger className="h-7 text-xs w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MUTABLE_STATUSES.map((s) => (
+                {ENTRY_STATUSES.map((s) => (
                   <SelectItem key={s.value} value={s.value} className="text-xs">
                     {s.label}
                   </SelectItem>
@@ -520,7 +567,8 @@ export function RosterTable({
           onOpenChange={(o) => { if (!o) setDialogRow(null); setDialogOpen(o); }}
           id={dialogRow.ID}
           initialStatus={dialogRow.Status}
-          hasSelector={hasSelector}
+          hasSelector={editable}
+          callId={callId}
           onStatusChanged={() => onRefresh?.()}
         />
       )}

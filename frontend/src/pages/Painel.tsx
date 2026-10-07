@@ -8,13 +8,14 @@ import {
   FetchWaitlistSelection,
   FetchRegistrationsBySelectionID,
   FetchCalls,
+  FetchSemesters,
 } from '@/lib/backend';
+import type { types } from '../../wailsjs/go/models';
 
 interface SelectionInfo {
   year: number;
   totalApproved: number;
   totalWaitlisted: number;
-  totalEnrolled: number;
 }
 
 interface RollCall {
@@ -113,17 +114,20 @@ export default function Painel() {
   const navigate = useNavigate();
   const [info, setInfo] = useState<SelectionInfo | null>(null);
   const [calls, setCalls] = useState<RollCall[]>([]);
+  const [semesters, setSemesters] = useState<types.Semester[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const [approvedRes, waitlistRes, callsRes] = await Promise.all([
+        const [approvedRes, waitlistRes, callsRes, semestersRes] = await Promise.all([
           FetchApprovedSelection(),
           FetchWaitlistSelection(),
           FetchCalls(),
+          FetchSemesters(),
         ]);
+        setSemesters(semestersRes ?? []);
 
         const approved = approvedRes;
         const waitlisted = waitlistRes;
@@ -135,14 +139,10 @@ export default function Painel() {
             FetchRegistrationsBySelectionID(approved.ID),
             waitlisted ? FetchRegistrationsBySelectionID(waitlisted.ID) : Promise.resolve([]),
           ]);
-          const enrolled = (approvedRegs ?? []).filter(
-            (r) => r.Status?.toUpperCase?.() === 'ENROLLED'
-          ).length;
           setInfo({
             year: approved.Year,
             totalApproved: approvedRegs?.length ?? 0,
             totalWaitlisted: waitlistRegs?.length ?? 0,
-            totalEnrolled: enrolled,
           });
         }
 
@@ -205,21 +205,15 @@ export default function Painel() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="Convocados" value={info.totalApproved} sub="aprovados no SISU" accent />
         <StatCard label="Em espera" value={info.totalWaitlisted} sub="candidatos em espera" />
-        <StatCard
-          label="Chamadas"
-          value={calls.length}
-          sub={activeCall ? `${activeCall.Number}ª chamada aberta` : 'nenhuma chamada aberta'}
-        />
-        <StatCard
-          label="Vagas preenchidas"
-          value={`${info.totalEnrolled} / ${info.totalApproved}`}
-          sub={
-            info.totalApproved
-              ? `${((info.totalEnrolled / info.totalApproved) * 100).toFixed(1)}% das vagas`
-              : 'sem vagas'
-          }
-          progress={info.totalApproved ? (info.totalEnrolled / info.totalApproved) * 100 : 0}
-        />
+        {semesters.map((s) => (
+          <StatCard
+            key={s.Number}
+            label={`${s.Number}º semestre`}
+            value={`${s.Occupied} / ${s.Seats}`}
+            sub="vagas ocupadas"
+            progress={s.Seats ? (s.Occupied / s.Seats) * 100 : 0}
+          />
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
