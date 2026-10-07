@@ -15,6 +15,8 @@ const (
 	CallEntryKindInitial CallEntryKind = "initial"
 	// CallEntryKindWaitlist is a CallEntryKind of type waitlist.
 	CallEntryKindWaitlist CallEntryKind = "waitlist"
+	// CallEntryKindPromotion is a CallEntryKind of type promotion.
+	CallEntryKindPromotion CallEntryKind = "promotion"
 )
 
 var ErrInvalidCallEntryKind = errors.New("not a valid CallEntryKind")
@@ -32,8 +34,9 @@ func (x CallEntryKind) IsValid() bool {
 }
 
 var _CallEntryKindValue = map[string]CallEntryKind{
-	"initial":  CallEntryKindInitial,
-	"waitlist": CallEntryKindWaitlist,
+	"initial":   CallEntryKindInitial,
+	"waitlist":  CallEntryKindWaitlist,
+	"promotion": CallEntryKindPromotion,
 }
 
 // ParseCallEntryKind attempts to convert a string to a CallEntryKind.
@@ -51,6 +54,8 @@ const (
 	CallEntryOutcomeEnrolled CallEntryOutcome = "enrolled"
 	// CallEntryOutcomeAbsent is a CallEntryOutcome of type absent.
 	CallEntryOutcomeAbsent CallEntryOutcome = "absent"
+	// CallEntryOutcomeDeclined is a CallEntryOutcome of type declined.
+	CallEntryOutcomeDeclined CallEntryOutcome = "declined"
 )
 
 var ErrInvalidCallEntryOutcome = errors.New("not a valid CallEntryOutcome")
@@ -71,6 +76,7 @@ var _CallEntryOutcomeValue = map[string]CallEntryOutcome{
 	"pending":  CallEntryOutcomePending,
 	"enrolled": CallEntryOutcomeEnrolled,
 	"absent":   CallEntryOutcomeAbsent,
+	"declined": CallEntryOutcomeDeclined,
 }
 
 // ParseCallEntryOutcome attempts to convert a string to a CallEntryOutcome.

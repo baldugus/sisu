@@ -108,12 +108,13 @@ are the canonical shadcn pages. Page shell + header:
   AddressLine2, HouseNumber, Neighborhood, Municipality, State, CEP, Email, Phone1, Phone2`.
 - **Course** — `ID, Seats, MinimumScore, Period ("morning"|"evening"), Quota`.
 - **CallSummary** (`FetchCalls`) — `ID, Number, Status ("calling"|"done"), Pending, Semesters[]`
-  with per-semester counts of `Initial` and `Waitlist` entries.
+  with per-semester counts of `Initial`, `Waitlist`, `Promotion` entries.
 - **CallEntry** — a registration in a call: `CallID, CallNumber, RegistrationID, Kind
-  ("initial"|"waitlist"), Semester, Outcome ("pending"|"enrolled"|"absent")`.
-  `FetchCallEntries(callID)` returns `CallEntryDetail { Entry, Registration, Course }`.
-  Change outcomes with `SetCallEntryOutcome(callID, registrationID, outcome)`;
-  `src/lib/status.ts` maps outcomes to the status badges.
+  ("initial"|"waitlist"|"promotion"), Semester, Outcome ("pending"|"enrolled"|"absent"|"declined"),
+  WantsPromotion`. `FetchCallEntries(callID)` returns `CallEntryDetail { Entry, Registration, Course }`.
+  Change outcomes with `SetCallEntryOutcome(callID, registrationID, outcome)` and promotion
+  requests with `SetWantsPromotion(callID, registrationID, bool)`; `src/lib/status.ts` maps
+  outcomes to the status badges.
 - **Semester** — `Number, Seats, Occupied`; always two.
 
 ## Conventions

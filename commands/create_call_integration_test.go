@@ -124,11 +124,74 @@ func TestCreateCall_WaitlistFillsSemesterOneFirst(t *testing.T) {
 	entries := testutil.CallEntries(t, db.Database, call2)
 	assert.Equal(t, []int32{waitlist[0].ID}, entryIDs(entries, types.CallEntryKindWaitlist, 1), "best ranked goes to semester 1")
 	assert.Equal(t, []int32{waitlist[1].ID}, entryIDs(entries, types.CallEntryKindWaitlist, 2))
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindPromotion, 1))
 
 	testutil.AssertRegistrationStatus(t, db.Database, waitlist[0].ID, types.RegistrationStatusApproved)
 	testutil.AssertRegistrationSemester(t, db.Database, waitlist[0].ID, ptr(1))
 	testutil.AssertRegistrationStatus(t, db.Database, waitlist[2].ID, types.RegistrationStatusWaitlisted)
 	testutil.AssertSemesterOccupancy(t, db.Database, 2, 2)
+}
+
+// TestPromotionFlow walks the promotion rules: a semester-2 student who asked to
+// move up is offered semester 1 before the waitlist; while the offer is pending
+// or declined they stay in semester 2; accepting moves them and frees their
+// semester-2 seat for the next call.
+func TestPromotionFlow(t *testing.T) {
+	db, call1, regs := splitCycle(t)
+	waitlist := waitlistByRank(t, db.Database)
+
+	// Call 1: rank 1 (sem 1) absent; ranks 3 and 4 (sem 2) both want semester 1.
+	testutil.SetOutcome(t, db.Database, call1, regs[0].ID, types.CallEntryOutcomeAbsent)
+	testutil.SetOutcome(t, db.Database, call1, regs[2].ID, types.CallEntryOutcomeEnrolled)
+	testutil.SetOutcome(t, db.Database, call1, regs[3].ID, types.CallEntryOutcomeEnrolled)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, true)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[3].ID, true)
+	testutil.CloseCallWithEnrollment(t, db.Database, call1)
+
+	// Call 2: the single semester-1 seat goes to the best ranked requester.
+	call2 := testutil.CreateCall(t, db.Database)
+	entries := testutil.CallEntries(t, db.Database, call2)
+	assert.Equal(t, []int32{regs[2].ID}, entryIDs(entries, types.CallEntryKindPromotion, 1))
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindWaitlist, 1), "promotion took the only seat")
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindWaitlist, 2), "semester 2 is full until the promotion is accepted")
+
+	// A pending offer leaves the student enrolled in semester 2.
+	testutil.AssertRegistrationStatus(t, db.Database, regs[2].ID, types.RegistrationStatusEnrolled)
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(2))
+
+	// Declined: still semester 2, and never offered again.
+	testutil.SetOutcome(t, db.Database, call2, regs[2].ID, types.CallEntryOutcomeDeclined)
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(2))
+	testutil.AssertSemesterOccupancy(t, db.Database, 1, 2)
+	testutil.CloseCall(t, db.Database, call2)
+
+	// Call 3: the next requester gets the seat.
+	call3 := testutil.CreateCall(t, db.Database)
+	entries = testutil.CallEntries(t, db.Database, call3)
+	assert.Equal(t, []int32{regs[3].ID}, entryIDs(entries, types.CallEntryKindPromotion, 1))
+
+	// Accepted: moves to semester 1, freeing a semester-2 seat.
+	testutil.SetOutcome(t, db.Database, call3, regs[3].ID, types.CallEntryOutcomeEnrolled)
+	testutil.AssertRegistrationStatus(t, db.Database, regs[3].ID, types.RegistrationStatusEnrolled)
+	testutil.AssertRegistrationSemester(t, db.Database, regs[3].ID, ptr(1))
+	testutil.AssertSemesterOccupancy(t, db.Database, 2, 1)
+	testutil.CloseCall(t, db.Database, call3)
+
+	// Call 4: the freed semester-2 seat goes to the waitlist.
+	call4 := testutil.CreateCall(t, db.Database)
+	entries = testutil.CallEntries(t, db.Database, call4)
+	assert.Empty(t, entryIDs(entries, types.CallEntryKindPromotion, 1))
+	assert.Equal(t, []int32{waitlist[0].ID}, entryIDs(entries, types.CallEntryKindWaitlist, 2))
+
+	// History shows every step for the promoted student.
+	detail, err := db.FetchRegistrationByID(regs[3].ID)
+	require.NoError(t, err)
+	require.Len(t, detail.History, 2)
+	assert.Equal(t, int32(1), detail.History[0].CallNumber)
+	assert.Equal(t, types.CallEntryKindInitial, detail.History[0].Kind)
+	assert.True(t, detail.History[0].WantsPromotion)
+	assert.Equal(t, int32(3), detail.History[1].CallNumber)
+	assert.Equal(t, types.CallEntryKindPromotion, detail.History[1].Kind)
 }
 
 // TestRegistrationHistory checks that a registration's history lists its
@@ -164,14 +227,14 @@ func TestRegistrationHistory(t *testing.T) {
 func TestUndoToImport(t *testing.T) {
 	db, call1, regs := splitCycle(t)
 
-	waitlist := waitlistByRank(t, db.Database)
-
 	testutil.SetOutcome(t, db.Database, call1, regs[0].ID, types.CallEntryOutcomeAbsent)
+	testutil.SetOutcome(t, db.Database, call1, regs[2].ID, types.CallEntryOutcomeEnrolled)
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, true)
 	testutil.CloseCallWithEnrollment(t, db.Database, call1)
 
 	call2 := testutil.CreateCall(t, db.Database)
-	testutil.CloseCallWithEnrollment(t, db.Database, call2)
-	testutil.AssertRegistrationStatus(t, db.Database, waitlist[0].ID, types.RegistrationStatusEnrolled)
+	testutil.CloseCallWithEnrollment(t, db.Database, call2) // accepts the promotion
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(1))
 
 	// Undo, most recent action first.
 	reopenCall := commands.OpenCallCommand{ID: call2}
@@ -179,8 +242,7 @@ func TestUndoToImport(t *testing.T) {
 
 	deleteCall := commands.DeleteCallCommand{ID: call2}
 	require.NoError(t, deleteCall.Execute(db.Database))
-	testutil.AssertRegistrationStatus(t, db.Database, waitlist[0].ID, types.RegistrationStatusWaitlisted)
-	testutil.AssertRegistrationSemester(t, db.Database, waitlist[0].ID, nil)
+	testutil.AssertRegistrationSemester(t, db.Database, regs[2].ID, ptr(2))
 
 	reopenCall1 := commands.OpenCallCommand{ID: call1}
 	require.NoError(t, reopenCall1.Execute(db.Database))
@@ -188,6 +250,8 @@ func TestUndoToImport(t *testing.T) {
 	for _, reg := range regs {
 		testutil.ClearRegistrationStatus(t, db.Database, reg.ID)
 	}
+
+	testutil.SetWantsPromotion(t, db.Database, call1, regs[2].ID, false)
 
 	// Back to "just imported": the approved list can be deleted again.
 	testutil.DeleteWaitlistSelection(t, db.Database)

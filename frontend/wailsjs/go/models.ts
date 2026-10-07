@@ -7,6 +7,7 @@ export namespace types {
 	    Kind: string;
 	    Semester: number;
 	    Outcome: string;
+	    WantsPromotion: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CallEntry(source);
@@ -20,6 +21,7 @@ export namespace types {
 	        this.Kind = source["Kind"];
 	        this.Semester = source["Semester"];
 	        this.Outcome = source["Outcome"];
+	        this.WantsPromotion = source["WantsPromotion"];
 	    }
 	}
 	export class Course {
@@ -178,6 +180,7 @@ export namespace types {
 	    Semester: number;
 	    Initial: number;
 	    Waitlist: number;
+	    Promotion: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new CallSemesterSummary(source);
@@ -188,6 +191,7 @@ export namespace types {
 	        this.Semester = source["Semester"];
 	        this.Initial = source["Initial"];
 	        this.Waitlist = source["Waitlist"];
+	        this.Promotion = source["Promotion"];
 	    }
 	}
 	export class CallSummary {

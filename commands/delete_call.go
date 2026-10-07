@@ -9,7 +9,7 @@ import (
 
 // DeleteCallCommand removes the last call. Its entries are deleted with it
 // (ON DELETE CASCADE), which reverts everything the call did: called students
-// go back to the waitlist.
+// go back to the waitlist and promotions back to semester 2.
 type DeleteCallCommand struct {
 	ID int32
 }

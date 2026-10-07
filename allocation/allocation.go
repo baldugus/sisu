@@ -2,8 +2,16 @@
 // is opened. It is a pure function over plain data so it can be tested without
 // a database.
 //
-// For each course (time slot × quota), the semester 1 vacancies, then the
-// semester 2 vacancies, are filled from the waitlist, best ranked first.
+// For each course (time slot × quota) the rule is:
+//
+//  1. Semester 1 vacancies are offered first to semester-2 students who asked
+//     to move up (promotion), best ranked first.
+//  2. The remaining semester 1 vacancies, then the semester 2 vacancies, are
+//     filled from the waitlist, best ranked first.
+//
+// Seats freed by a promotion only become
+// available in the next call, once the promotion is accepted, so a student who
+// declines never leaves semester 2 overbooked.
 package allocation
 
 import (
@@ -25,6 +33,8 @@ type Course struct {
 	SeatsPerSemester int32
 	// Occupied is indexed by semester - 1.
 	Occupied [2]int32
+	// Promotion lists semester-2 students eligible to move to semester 1.
+	Promotion []Candidate
 	// Waitlist lists waitlist registrations that were never called.
 	Waitlist []Candidate
 }
@@ -39,13 +49,15 @@ type CourseResult struct {
 	CourseID int32
 	// Vacancies is indexed by semester - 1.
 	Vacancies [2]int32
+	// Promoted are offered a seat in semester 1.
+	Promoted []int32
 	// Waitlist is indexed by semester - 1.
 	Waitlist [2][]int32
 }
 
 // Total is the number of registrations called for the course.
 func (r *CourseResult) Total() int {
-	return len(r.Waitlist[0]) + len(r.Waitlist[1])
+	return len(r.Promoted) + len(r.Waitlist[0]) + len(r.Waitlist[1])
 }
 
 // Plan applies the rule to every course, in input order.
@@ -66,11 +78,19 @@ func planCourse(course Course) CourseResult {
 		result.Vacancies[s] = max(0, course.SeatsPerSemester-course.Occupied[s])
 	}
 
+	promotion := SortByRanking(course.Promotion)
 	waitlist := SortByRanking(course.Waitlist)
 
+	free1 := int(result.Vacancies[0])
+	for _, c := range promotion[:min(free1, len(promotion))] {
+		result.Promoted = append(result.Promoted, c.RegistrationID)
+	}
+
+	free1 -= len(result.Promoted)
+
 	next := 0
-	for s, free := range result.Vacancies {
-		n := min(int(free), len(waitlist)-next)
+	for s, free := range []int{free1, int(result.Vacancies[1])} {
+		n := min(free, len(waitlist)-next)
 		for _, c := range waitlist[next : next+n] {
 			result.Waitlist[s] = append(result.Waitlist[s], c.RegistrationID)
 		}

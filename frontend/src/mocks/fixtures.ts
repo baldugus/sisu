@@ -3,7 +3,7 @@
  * Shapes mirror the Go structs in sisu/types/.
  *
  * Scenario: two courses (morning 4 seats, evening 2 seats). Call 1 is closed;
- * call 2 is open, calling the waitlist for the seats freed by absences.
+ * call 2 is open with one promotion offer and one waitlist call.
  */
 
 const NAMES = [
@@ -83,15 +83,15 @@ export const mockCalls = [
 
 export const mockEntries = [
   // Call 1 — approved list split across semesters.
-  { CallID: 1, RegistrationID: 1, Kind: 'initial', Semester: 1, Outcome: 'enrolled' },
-  { CallID: 1, RegistrationID: 2, Kind: 'initial', Semester: 1, Outcome: 'absent' },
-  { CallID: 1, RegistrationID: 3, Kind: 'initial', Semester: 2, Outcome: 'enrolled' },
-  { CallID: 1, RegistrationID: 4, Kind: 'initial', Semester: 2, Outcome: 'enrolled' },
-  { CallID: 1, RegistrationID: 5, Kind: 'initial', Semester: 1, Outcome: 'absent' },
-  { CallID: 1, RegistrationID: 6, Kind: 'initial', Semester: 2, Outcome: 'enrolled' },
-  // Call 2 — the waitlist fills the seats freed in semester 1.
-  { CallID: 2, RegistrationID: 7, Kind: 'waitlist', Semester: 1, Outcome: 'pending' },
-  { CallID: 2, RegistrationID: 9, Kind: 'waitlist', Semester: 1, Outcome: 'pending' },
+  { CallID: 1, RegistrationID: 1, Kind: 'initial', Semester: 1, Outcome: 'enrolled', WantsPromotion: false },
+  { CallID: 1, RegistrationID: 2, Kind: 'initial', Semester: 1, Outcome: 'absent', WantsPromotion: false },
+  { CallID: 1, RegistrationID: 3, Kind: 'initial', Semester: 2, Outcome: 'enrolled', WantsPromotion: true },
+  { CallID: 1, RegistrationID: 4, Kind: 'initial', Semester: 2, Outcome: 'enrolled', WantsPromotion: false },
+  { CallID: 1, RegistrationID: 5, Kind: 'initial', Semester: 1, Outcome: 'absent', WantsPromotion: false },
+  { CallID: 1, RegistrationID: 6, Kind: 'initial', Semester: 2, Outcome: 'enrolled', WantsPromotion: false },
+  // Call 2 — promotion first, then the waitlist.
+  { CallID: 2, RegistrationID: 3, Kind: 'promotion', Semester: 1, Outcome: 'pending', WantsPromotion: false },
+  { CallID: 2, RegistrationID: 9, Kind: 'waitlist', Semester: 1, Outcome: 'pending', WantsPromotion: false },
 ];
 
 export const mockSemesters = [{ Number: 1 }, { Number: 2 }];

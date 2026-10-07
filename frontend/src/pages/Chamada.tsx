@@ -51,7 +51,7 @@ export default function Chamada() {
           <p className="text-xs text-muted-foreground mt-0.5">
             {isOpen
               ? pending > 0
-                ? `${pending} pendente${pending !== 1 ? 's' : ''} — registre matrícula ou falta.`
+                ? `${pending} pendente${pending !== 1 ? 's' : ''} — registre matrícula, falta ou resposta à promoção.`
                 : 'Nenhuma pendência — a chamada pode ser fechada.'
               : 'Chamada fechada — somente leitura. Reabra em "Chamadas" para editar.'}
           </p>

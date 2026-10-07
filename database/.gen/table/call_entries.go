@@ -22,6 +22,7 @@ type callEntriesTable struct {
 	Kind           sqlite.ColumnString
 	Semester       sqlite.ColumnInteger
 	Outcome        sqlite.ColumnString
+	WantsPromotion sqlite.ColumnInteger
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -68,9 +69,10 @@ func newCallEntriesTableImpl(schemaName, tableName, alias string) callEntriesTab
 		KindColumn           = sqlite.StringColumn("kind")
 		SemesterColumn       = sqlite.IntegerColumn("semester")
 		OutcomeColumn        = sqlite.StringColumn("outcome")
-		allColumns           = sqlite.ColumnList{CallIDColumn, RegistrationIDColumn, KindColumn, SemesterColumn, OutcomeColumn}
-		mutableColumns       = sqlite.ColumnList{KindColumn, SemesterColumn, OutcomeColumn}
-		defaultColumns       = sqlite.ColumnList{}
+		WantsPromotionColumn = sqlite.IntegerColumn("wants_promotion")
+		allColumns           = sqlite.ColumnList{CallIDColumn, RegistrationIDColumn, KindColumn, SemesterColumn, OutcomeColumn, WantsPromotionColumn}
+		mutableColumns       = sqlite.ColumnList{KindColumn, SemesterColumn, OutcomeColumn, WantsPromotionColumn}
+		defaultColumns       = sqlite.ColumnList{WantsPromotionColumn}
 	)
 
 	return callEntriesTable{
@@ -82,6 +84,7 @@ func newCallEntriesTableImpl(schemaName, tableName, alias string) callEntriesTab
 		Kind:           KindColumn,
 		Semester:       SemesterColumn,
 		Outcome:        OutcomeColumn,
+		WantsPromotion: WantsPromotionColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

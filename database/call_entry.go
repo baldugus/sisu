@@ -179,6 +179,25 @@ func UpdateCallEntryOutcome(db qrm.DB, callID, registrationID int32, outcome typ
 	return err
 }
 
+func UpdateCallEntryWantsPromotion(db qrm.DB, callID, registrationID int32, wants bool) error {
+	var value int32
+	if wants {
+		value = 1
+	}
+
+	stmt := CallEntries.UPDATE().
+		SET(
+			CallEntries.WantsPromotion.SET(Int32(value)),
+		).
+		WHERE(
+			CallEntries.CallID.EQ(Int32(callID)).
+				AND(CallEntries.RegistrationID.EQ(Int32(registrationID))),
+		)
+
+	_, err := stmt.Exec(db)
+	return err
+}
+
 func (d *Database) CallHasPendingEntries(callID int32) (bool, error) {
 	stmt := SELECT(
 		CallEntries.RegistrationID,
@@ -200,7 +219,8 @@ func (d *Database) CallHasPendingEntries(callID int32) (bool, error) {
 }
 
 // SelectionHasModifiedEntries reports whether any registration of the selection
-// has an entry the operator already acted on (a recorded outcome).
+// has an entry the operator already acted on (a recorded outcome or a promotion
+// request).
 func (d *Database) SelectionHasModifiedEntries(kind types.SelectionKind) (bool, error) {
 	stmt := SELECT(
 		CallEntries.RegistrationID,
@@ -210,7 +230,10 @@ func (d *Database) SelectionHasModifiedEntries(kind types.SelectionKind) (bool, 
 			INNER_JOIN(Selections, Selections.ID.EQ(Registrations.SelectionID)),
 	).WHERE(
 		Selections.Kind.EQ(String(kind.String())).
-			AND(CallEntries.Outcome.NOT_EQ(String(types.CallEntryOutcomePending.String()))),
+			AND(
+				CallEntries.Outcome.NOT_EQ(String(types.CallEntryOutcomePending.String())).
+					OR(CallEntries.WantsPromotion.EQ(Int32(1))),
+			),
 	).LIMIT(1)
 
 	var result []int32
@@ -251,6 +274,45 @@ func FetchOccupiedSeats(db qrm.DB) ([]CourseSemesterCount, error) {
 	)
 
 	var result []CourseSemesterCount
+
+	err := stmt.Query(db, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// FetchPromotionCandidates returns semester-2 students who are enrolled, asked
+// to move to semester 1, and were never offered a promotion before (an
+// accepted offer moves them to semester 1; a declined one is final).
+func FetchPromotionCandidates(db qrm.DB) ([]model.Registrations, error) {
+	offer := CallEntries.AS("offer")
+
+	stmt := SELECT(
+		Registrations.AllColumns,
+	).FROM(
+		Registrations.
+			INNER_JOIN(view.RegistrationPlacements, view.RegistrationPlacements.RegistrationID.EQ(Registrations.ID)).
+			INNER_JOIN(CallEntries,
+				CallEntries.CallID.EQ(view.RegistrationPlacements.CallID).
+					AND(CallEntries.RegistrationID.EQ(Registrations.ID)),
+			),
+	).WHERE(
+		view.RegistrationPlacements.Semester.EQ(Int32(2)).
+			AND(view.RegistrationPlacements.Outcome.EQ(String(types.CallEntryOutcomeEnrolled.String()))).
+			AND(CallEntries.WantsPromotion.EQ(Int32(1))).
+			AND(NOT(EXISTS(
+				SELECT(offer.RegistrationID).
+					FROM(offer).
+					WHERE(
+						offer.RegistrationID.EQ(Registrations.ID).
+							AND(offer.Kind.EQ(String(types.CallEntryKindPromotion.String()))),
+					),
+			))),
+	)
+
+	var result []model.Registrations
 
 	err := stmt.Query(db, &result)
 	if err != nil {
@@ -367,6 +429,8 @@ func (d *Database) FetchCallSummaries() ([]*types.CallSummary, error) {
 			sem.Initial += c.Count
 		case types.CallEntryKindWaitlist:
 			sem.Waitlist += c.Count
+		case types.CallEntryKindPromotion:
+			sem.Promotion += c.Count
 		}
 	}
 

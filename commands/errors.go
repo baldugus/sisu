@@ -111,7 +111,7 @@ func (e ErrCannotDeleteFirstCall) Error() string {
 type ErrNoCandidatesToCall struct{}
 
 func (e ErrNoCandidatesToCall) Error() string {
-	return "no one to call: no waitlisted registrations for the open seats"
+	return "no one to call: no promotion requests nor waitlisted registrations for the open seats"
 }
 
 type ErrNoCalls struct{}
@@ -124,4 +124,10 @@ type ErrInvalidSemester struct{}
 
 func (e ErrInvalidSemester) Error() string {
 	return "semester must be 1 or 2"
+}
+
+type ErrPromotionNotAllowed struct{}
+
+func (e ErrPromotionNotAllowed) Error() string {
+	return "only semester-2 students who were not absent can ask for promotion"
 }

@@ -54,6 +54,8 @@ export function SaveFileDialog(arg1:string,arg2:string,arg3:string,arg4:string):
 
 export function SetCallEntryOutcome(arg1:number,arg2:number,arg3:string):Promise<void>;
 
+export function SetWantsPromotion(arg1:number,arg2:number,arg3:boolean):Promise<void>;
+
 export function TeacherPDF(arg1:string,arg2:number,arg3:string):Promise<void>;
 
 export function WebsitePDF(arg1:number,arg2:string,arg3:number,arg4:string):Promise<void>;

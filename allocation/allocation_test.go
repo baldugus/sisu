@@ -23,18 +23,26 @@ func TestPlan(t *testing.T) {
 		name          string
 		course        allocation.Course
 		wantVacancies [2]int32
+		wantPromoted  []int32
 		wantWaitlist1 []int32
 		wantWaitlist2 []int32
 	}{
 		{
 			name:          "no vacancies calls no one",
-			course:        allocation.Course{SeatsPerSemester: 2, Occupied: [2]int32{2, 2}, Waitlist: cands(20)},
+			course:        allocation.Course{SeatsPerSemester: 2, Occupied: [2]int32{2, 2}, Promotion: cands(10), Waitlist: cands(20)},
 			wantVacancies: [2]int32{0, 0},
 		},
 		{
-			name:          "waitlist fills semester 1 first, best ranked first",
-			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{3, 4}, Waitlist: cands(22, 20, 21, 23)},
-			wantVacancies: [2]int32{2, 1},
+			name:          "promotion fills semester 1 before the waitlist",
+			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{3, 5}, Promotion: cands(11, 10), Waitlist: cands(20, 21)},
+			wantVacancies: [2]int32{2, 0},
+			wantPromoted:  []int32{10, 11},
+		},
+		{
+			name:          "waitlist fills what promotion leaves, semester 1 first",
+			course:        allocation.Course{SeatsPerSemester: 5, Occupied: [2]int32{2, 4}, Promotion: cands(10), Waitlist: cands(22, 20, 21, 23)},
+			wantVacancies: [2]int32{3, 1},
+			wantPromoted:  []int32{10},
 			wantWaitlist1: []int32{20, 21},
 			wantWaitlist2: []int32{22},
 		},
@@ -59,6 +67,7 @@ func TestPlan(t *testing.T) {
 
 			assert.Len(t, got, 1)
 			assert.Equal(t, tt.wantVacancies, got[0].Vacancies)
+			assert.Equal(t, tt.wantPromoted, got[0].Promoted)
 			assert.Equal(t, tt.wantWaitlist1, got[0].Waitlist[0])
 			assert.Equal(t, tt.wantWaitlist2, got[0].Waitlist[1])
 		})

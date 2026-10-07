@@ -39,6 +39,7 @@ export function useRollCallRows(callId: number) {
           Ranking: reg.Ranking,
           Semester: entry.Semester,
           Kind: entry.Kind as EntryKind,
+          WantsPromotion: entry.WantsPromotion,
         }];
       });
 

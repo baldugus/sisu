@@ -85,22 +85,30 @@ CREATE TABLE registrations (
 -- is recorded here, owned by the call that caused it. Deleting a call deletes
 -- its entries, which reverts every effect of that call.
 --
--- kind:     initial  = approved list, placed by the import (call 1)
---           waitlist = called from the waitlist
--- outcome:  pending | enrolled | absent
+-- kind:     initial   = approved list, placed by the import (call 1)
+--           waitlist  = called from the waitlist
+--           promotion = semester-2 student offered a seat in semester 1
+-- outcome:  pending | enrolled | absent (initial/waitlist)
+--           pending | enrolled | declined (promotion; enrolled = accepted)
 CREATE TABLE call_entries (
   call_id         INTEGER NOT NULL REFERENCES calls ON DELETE CASCADE ON UPDATE RESTRICT,
   registration_id INTEGER NOT NULL REFERENCES registrations ON DELETE CASCADE ON UPDATE RESTRICT,
-  kind            TEXT NOT NULL CHECK (kind IN ('initial', 'waitlist')),
+  kind            TEXT NOT NULL CHECK (kind IN ('initial', 'waitlist', 'promotion')),
   semester        INTEGER NOT NULL REFERENCES semesters(number) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  outcome         TEXT NOT NULL CHECK (outcome IN ('pending', 'enrolled', 'absent')),
-  PRIMARY KEY (call_id, registration_id)
+  outcome         TEXT NOT NULL CHECK (outcome IN ('pending', 'enrolled', 'absent', 'declined')),
+  wants_promotion INTEGER NOT NULL DEFAULT 0 CHECK (wants_promotion IN (0, 1)),
+  PRIMARY KEY (call_id, registration_id),
+  CHECK (kind = 'promotion' OR outcome <> 'declined'),
+  CHECK (kind <> 'promotion' OR outcome <> 'absent'),
+  CHECK (wants_promotion = 0 OR (semester = 2 AND kind <> 'promotion'))
 );
 
 CREATE INDEX idx_call_entries_registration ON call_entries(registration_id);
 
 -- Current placement of every registration, derived from its call entries: the
--- entry from the latest call. No placement = never called (waitlisted).
+-- entry from the latest call, ignoring promotion offers that were not accepted
+-- (a pending or declined offer leaves the student where they were).
+-- No placement = never called (waitlisted).
 CREATE VIEW registration_placements AS
 SELECT
   r.id        AS registration_id,
@@ -119,4 +127,5 @@ LEFT JOIN (
     ROW_NUMBER() OVER (PARTITION BY ce.registration_id ORDER BY c.number DESC) AS rn
   FROM call_entries ce
   INNER JOIN calls c ON c.id = ce.call_id
+  WHERE ce.kind <> 'promotion' OR ce.outcome = 'enrolled'
 ) p ON p.registration_id = r.id AND p.rn = 1;
