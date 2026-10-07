@@ -19,9 +19,6 @@ type Registrations struct {
 	EssayScore           int32
 	CompositeScore       int32
 	Ranking              int32
-	Status               string
 	SelectionID          int32
-	CallID               *int32
 	CandidateID          int32
-	SemesterID           *int32
 }

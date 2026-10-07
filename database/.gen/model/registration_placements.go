@@ -7,8 +7,10 @@
 
 package model
 
-type Calls struct {
-	ID     int32 `sql:"primary_key"`
-	Number int32
-	Status string
+type RegistrationPlacements struct {
+	RegistrationID *int32
+	CallID         *int32
+	Kind           *string
+	Semester       *int32
+	Outcome        *string
 }

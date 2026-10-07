@@ -45,8 +45,7 @@ func TestCompleteAdmissionCycle(t *testing.T) {
 
 	// Step 3: Process call #1 - enroll some, mark some absent
 	t.Log("Step 3: Processing call #1")
-	call1Regs, err := db.FetchRegistrationsByCallID(call1)
-	require.NoError(t, err)
+	call1Regs := testutil.RegistrationsInCall(t, db.Database, call1)
 	require.Len(t, call1Regs, 5)
 
 	// Enroll 3 students
@@ -74,8 +73,7 @@ func TestCompleteAdmissionCycle(t *testing.T) {
 	testutil.AssertCallStatus(t, db.Database, call2, types.CallStatusCalling)
 
 	// Verify students were promoted to call #2
-	call2Regs, err := db.FetchRegistrationsByCallID(call2)
-	require.NoError(t, err)
+	call2Regs := testutil.RegistrationsInCall(t, db.Database, call2)
 	assert.Greater(t, len(call2Regs), 0, "should have promoted waitlisted students")
 
 	// Verify promoted students have approved status
@@ -106,7 +104,7 @@ func TestCompleteAdmissionCycle(t *testing.T) {
 	t.Log("Step 8: Verifying final state")
 
 	// Get all calls
-	calls, err := db.FetchCalls()
+	calls, err := db.FetchCallSummaries()
 	require.NoError(t, err)
 	assert.Len(t, calls, 2, "should have 2 calls")
 
@@ -146,8 +144,7 @@ func TestAdmissionCycle_WithClearStatus(t *testing.T) {
 	call1, err := db.FetchCallByNumber(1)
 	require.NoError(t, err)
 
-	regs, err := db.FetchRegistrationsByCallID(call1.ID)
-	require.NoError(t, err)
+	regs := testutil.RegistrationsInCall(t, db.Database, call1.ID)
 	reg := regs[0]
 
 	// Enroll student
@@ -181,7 +178,7 @@ func TestAdmissionCycle_MultipleCallsProgression(t *testing.T) {
 	testutil.CloseCallWithEnrollment(t, db.Database, call2)
 
 	// Verify call numbers are sequential
-	calls, err := db.FetchCalls()
+	calls, err := db.FetchCallSummaries()
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(calls), 2, "should have at least 2 calls")
 

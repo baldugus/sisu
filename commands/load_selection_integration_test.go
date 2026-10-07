@@ -284,10 +284,10 @@ func TestLoadApprovedSelection_SplitsBySemester(t *testing.T) {
 	require.NoError(t, err)
 
 	rows, err := db.DB().QueryContext(context.Background(), `
-		SELECT c.name, s.number
+		SELECT c.name, e.semester
 		FROM registrations r
 		JOIN candidates c ON c.id = r.candidate_id
-		JOIN semesters s ON s.id = r.semester_id`)
+		JOIN call_entries e ON e.registration_id = r.id`)
 	require.NoError(t, err)
 	defer rows.Close()
 

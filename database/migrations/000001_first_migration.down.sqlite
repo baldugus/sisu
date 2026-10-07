@@ -1,3 +1,6 @@
+DROP VIEW registration_placements;
+DROP INDEX idx_call_entries_registration;
+DROP TABLE call_entries;
 DROP TABLE registrations;
 DROP TABLE candidates;
 DROP INDEX idx_course_time_slot_quota;

@@ -42,12 +42,6 @@ func (e ErrRegistrationNotFound) Error() string {
 	return "registration not found"
 }
 
-type ErrRegistrationNotInCall struct{}
-
-func (e ErrRegistrationNotInCall) Error() string {
-	return "registration is not in a call"
-}
-
 type ErrCallNotOpen struct{}
 
 func (e ErrCallNotOpen) Error() string {
@@ -60,22 +54,10 @@ func (e ErrInvalidStatusTransition) Error() string {
 	return "invalid status transition"
 }
 
-type ErrNoSeatsAvailable struct{}
-
-func (e ErrNoSeatsAvailable) Error() string {
-	return "no seats available in course"
-}
-
 type ErrOpenCallExists struct{}
 
 func (e ErrOpenCallExists) Error() string {
 	return "cannot create new call while another is open"
-}
-
-type ErrNoWaitlistedRegistrations struct{}
-
-func (e ErrNoWaitlistedRegistrations) Error() string {
-	return "no waitlisted registrations to promote"
 }
 
 type ErrAllCoursesFull struct{}
@@ -112,4 +94,34 @@ type ErrCannotDeleteClosedCall struct{}
 
 func (e ErrCannotDeleteClosedCall) Error() string {
 	return "cannot delete a closed call"
+}
+
+type ErrCallNotFound struct{}
+
+func (e ErrCallNotFound) Error() string {
+	return "call not found"
+}
+
+type ErrCannotDeleteFirstCall struct{}
+
+func (e ErrCannotDeleteFirstCall) Error() string {
+	return "the first call can only be removed by deleting the approved selection"
+}
+
+type ErrNoCandidatesToCall struct{}
+
+func (e ErrNoCandidatesToCall) Error() string {
+	return "no one to call: no waitlisted registrations for the open seats"
+}
+
+type ErrNoCalls struct{}
+
+func (e ErrNoCalls) Error() string {
+	return "no calls exist; import the approved list first"
+}
+
+type ErrInvalidSemester struct{}
+
+func (e ErrInvalidSemester) Error() string {
+	return "semester must be 1 or 2"
 }
