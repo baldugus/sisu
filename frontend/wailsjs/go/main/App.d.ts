@@ -50,6 +50,8 @@ export function OpenCall(arg1:number):Promise<void>;
 
 export function OpenFileDialog(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function PreviewCall():Promise<types.CallPlan>;
+
 export function ReopenSemester(arg1:number):Promise<void>;
 
 export function Restore(arg1:string):Promise<void>;

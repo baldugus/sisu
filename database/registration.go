@@ -77,6 +77,15 @@ func (d *Database) FetchRegistrationsByCourseID(courseID int32) ([]*types.Regist
 	return fetchRegistrations(d.db, Registrations.CourseID.EQ(Int32(courseID)))
 }
 
+// FetchRegistrationsByIDs returns the given registrations (any order).
+func FetchRegistrationsByIDs(db qrm.DB, ids []int32) ([]*types.Registration, error) {
+	if len(ids) == 0 {
+		return []*types.Registration{}, nil
+	}
+
+	return fetchRegistrations(db, Registrations.ID.IN(int32Exprs(ids)...))
+}
+
 // FetchEnrolledRegistrationsByCourseAndSemester returns the students currently
 // enrolled in a course for one semester.
 func (d *Database) FetchEnrolledRegistrationsByCourseAndSemester(
@@ -197,4 +206,13 @@ func FetchCandidateIDsBySelectionID(db qrm.DB, selectionID int32) ([]int32, erro
 	}
 
 	return candidateIDs, nil
+}
+
+func int32Exprs(values []int32) []Expression {
+	exprs := make([]Expression, len(values))
+	for i, v := range values {
+		exprs[i] = Int32(v)
+	}
+
+	return exprs
 }

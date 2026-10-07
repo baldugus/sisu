@@ -175,3 +175,25 @@ export const FetchRegistration = async (id: number) =>
       .sort((a, b) => callNumber(a.CallID) - callNumber(b.CallID))
       .map(entry),
   });
+
+export const PreviewCall = async () => {
+  requireNoOpenCall();
+  const pick = (courseID: number, kind: string, semester: number) =>
+    NEXT_CALL.filter((p) => p.CourseID === courseID && p.Kind === kind && p.Semester === semester)
+      .map((p) => registration(p.RegistrationID));
+  return types.CallPlan.createFrom({
+    Number: f.mockCalls.length + 1,
+    Semesters: semesters(),
+    Courses: f.mockCourses.map((c) => ({
+      Course: c,
+      Vacancies1: c.ID === 1 ? 1 : 0,
+      Vacancies2: 0,
+      Promoted: pick(c.ID, 'promotion', 1),
+      Waitlist1: pick(c.ID, 'waitlist', 1),
+      Waitlist2: pick(c.ID, 'waitlist', 2),
+    })),
+    Promoted: 1,
+    Waitlist1: 0,
+    Waitlist2: 0,
+  });
+};

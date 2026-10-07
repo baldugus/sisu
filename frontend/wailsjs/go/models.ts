@@ -176,6 +176,106 @@ export namespace types {
 		    return a;
 		}
 	}
+	export class CoursePlan {
+	    Course?: Course;
+	    Vacancies1: number;
+	    Vacancies2: number;
+	    Promoted: Registration[];
+	    Waitlist1: Registration[];
+	    Waitlist2: Registration[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CoursePlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Course = this.convertValues(source["Course"], Course);
+	        this.Vacancies1 = source["Vacancies1"];
+	        this.Vacancies2 = source["Vacancies2"];
+	        this.Promoted = this.convertValues(source["Promoted"], Registration);
+	        this.Waitlist1 = this.convertValues(source["Waitlist1"], Registration);
+	        this.Waitlist2 = this.convertValues(source["Waitlist2"], Registration);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Semester {
+	    Number: number;
+	    Status: string;
+	    ClosedAfterCall?: number;
+	    Seats: number;
+	    Occupied: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Semester(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Number = source["Number"];
+	        this.Status = source["Status"];
+	        this.ClosedAfterCall = source["ClosedAfterCall"];
+	        this.Seats = source["Seats"];
+	        this.Occupied = source["Occupied"];
+	    }
+	}
+	export class CallPlan {
+	    Number: number;
+	    Semesters: Semester[];
+	    Courses: CoursePlan[];
+	    Promoted: number;
+	    Waitlist1: number;
+	    Waitlist2: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CallPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Number = source["Number"];
+	        this.Semesters = this.convertValues(source["Semesters"], Semester);
+	        this.Courses = this.convertValues(source["Courses"], CoursePlan);
+	        this.Promoted = source["Promoted"];
+	        this.Waitlist1 = source["Waitlist1"];
+	        this.Waitlist2 = source["Waitlist2"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CallSemesterSummary {
 	    Semester: number;
 	    Initial: number;
@@ -232,6 +332,7 @@ export namespace types {
 		    return a;
 		}
 	}
+	
 	
 	
 	
@@ -301,26 +402,6 @@ export namespace types {
 	        this.Year = source["Year"];
 	        this.Institution = source["Institution"];
 	        this.Degree = source["Degree"];
-	    }
-	}
-	export class Semester {
-	    Number: number;
-	    Status: string;
-	    ClosedAfterCall?: number;
-	    Seats: number;
-	    Occupied: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new Semester(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Number = source["Number"];
-	        this.Status = source["Status"];
-	        this.ClosedAfterCall = source["ClosedAfterCall"];
-	        this.Seats = source["Seats"];
-	        this.Occupied = source["Occupied"];
 	    }
 	}
 

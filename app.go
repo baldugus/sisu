@@ -377,6 +377,18 @@ func (a *App) ReopenSemester(number int32) error {
 	return nil
 }
 
+// PreviewCall shows who the next call would summon, without creating it.
+func (a *App) PreviewCall() (*types.CallPlan, error) {
+	cmd := commands.PreviewCallCommand{}
+
+	plan, err := cmd.Execute(a.sisu.database)
+	if err != nil {
+		return nil, translateError(err)
+	}
+
+	return plan, nil
+}
+
 func (a *App) CreateCall() error {
 	cmd := commands.CreateCallCommand{}
 

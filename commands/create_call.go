@@ -11,73 +11,73 @@ import (
 	"github.com/baldugus/sisu/types"
 )
 
-// CreateCallCommand opens the next call: promotions to semester 1 first, then
-// the waitlist (see package allocation).
+// PreviewCallCommand computes the next call without creating it.
+type PreviewCallCommand struct{}
+
+func (cmd *PreviewCallCommand) Execute(db *database.Database) (*types.CallPlan, error) {
+	plan, _, err := planNextCall(db, db.DB())
+	return plan, err
+}
+
+// CreateCallCommand opens the next call, calling exactly who PreviewCallCommand
+// shows: promotions to semester 1 first, then the waitlist (see package allocation).
 type CreateCallCommand struct{}
 
 func (cmd *CreateCallCommand) Execute(db *database.Database) error {
 	return db.RunInTx(func(tx qrm.DB) error {
-		next, err := planNextCall(db, tx)
+		plan, entries, err := planNextCall(db, tx)
 		if err != nil {
 			return err
 		}
 
-		if next.vacancies == 0 {
+		if plan.Vacancies() == 0 {
 			return ErrAllCoursesFull{}
 		}
 
-		if len(next.entries) == 0 {
+		if len(entries) == 0 {
 			return ErrNoCandidatesToCall{}
 		}
 
 		callID, err := database.CreateCall(tx, &types.Call{
-			Number: next.number,
+			Number: plan.Number,
 			Status: types.CallStatusCalling,
 		})
 		if err != nil {
 			return fmt.Errorf("create call: %w", err)
 		}
 
-		for _, e := range next.entries {
+		for _, e := range entries {
 			e.CallID = callID
 		}
 
-		return database.CreateCallEntries(tx, next.entries)
+		return database.CreateCallEntries(tx, entries)
 	})
 }
 
-// nextCall is what opening the next call would do.
-type nextCall struct {
-	number int32
-	// vacancies is the number of free seats across open semesters.
-	vacancies int32
-	// entries are the entries to insert (without CallID).
-	entries []*types.CallEntry
-}
-
-// planNextCall gathers the allocation input and runs the rule.
-func planNextCall(db *database.Database, tx qrm.DB) (*nextCall, error) {
+// planNextCall gathers the allocation input, runs the rule and returns both the
+// readable plan and the entries that would be inserted (without CallID).
+func planNextCall(db *database.Database, tx qrm.DB) (*types.CallPlan, []*types.CallEntry, error) {
 	hasOpenCall, err := db.HasOpenCall()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if hasOpenCall {
-		return nil, ErrOpenCallExists{}
+		return nil, nil, ErrOpenCallExists{}
 	}
 
 	lastCallNumber, err := db.GetLastCallNumber()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if lastCallNumber == 0 {
-		return nil, ErrNoCalls{}
+		return nil, nil, ErrNoCalls{}
 	}
 
 	semesters, err := database.FetchSemesters(tx)
 	if err != nil {
-		return nil, fmt.Errorf("fetch semesters: %w", err)
+		return nil, nil, fmt.Errorf("fetch semesters: %w", err)
 	}
 
 	var open [2]bool
@@ -86,46 +86,68 @@ func planNextCall(db *database.Database, tx qrm.DB) (*nextCall, error) {
 	}
 
 	if !open[0] && !open[1] {
-		return nil, ErrAllSemestersClosed{}
+		return nil, nil, ErrAllSemestersClosed{}
 	}
 
-	in, err := allocationInput(db, tx, open)
+	in, courses, registrations, err := allocationInput(db, tx, open)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	next := &nextCall{number: lastCallNumber + 1}
+	results := allocation.Plan(in)
 
-	for _, r := range allocation.Plan(in) {
-		next.vacancies += r.Vacancies[0] + r.Vacancies[1]
-
-		next.entries = append(next.entries, newEntries(r.Promoted, types.CallEntryKindPromotion, 1)...)
-		next.entries = append(next.entries, newEntries(r.Waitlist[0], types.CallEntryKindWaitlist, 1)...)
-		next.entries = append(next.entries, newEntries(r.Waitlist[1], types.CallEntryKindWaitlist, 2)...) //nolint: mnd
+	plan := &types.CallPlan{
+		Number:    lastCallNumber + 1,
+		Semesters: semesters,
 	}
 
-	return next, nil
+	var entries []*types.CallEntry
+
+	for i, r := range results {
+		coursePlan := &types.CoursePlan{
+			Course:     courses[i],
+			Vacancies1: r.Vacancies[0],
+			Vacancies2: r.Vacancies[1],
+			Promoted:   pick(registrations, r.Promoted),
+			Waitlist1:  pick(registrations, r.Waitlist[0]),
+			Waitlist2:  pick(registrations, r.Waitlist[1]),
+		}
+		plan.Courses = append(plan.Courses, coursePlan)
+		plan.Promoted += int32(len(r.Promoted))     //nolint: gosec
+		plan.Waitlist1 += int32(len(r.Waitlist[0])) //nolint: gosec
+		plan.Waitlist2 += int32(len(r.Waitlist[1])) //nolint: gosec
+
+		entries = append(entries, newEntries(r.Promoted, types.CallEntryKindPromotion, 1)...)
+		entries = append(entries, newEntries(r.Waitlist[0], types.CallEntryKindWaitlist, 1)...)
+		entries = append(entries, newEntries(r.Waitlist[1], types.CallEntryKindWaitlist, 2)...) //nolint: mnd
+	}
+
+	return plan, entries, nil
 }
 
-func allocationInput(db *database.Database, tx qrm.DB, open [2]bool) (allocation.Input, error) {
+func allocationInput(
+	db *database.Database,
+	tx qrm.DB,
+	open [2]bool,
+) (allocation.Input, []*types.Course, map[int32]*types.Registration, error) {
 	courses, err := db.FetchCourses()
 	if err != nil {
-		return allocation.Input{}, fmt.Errorf("fetch courses: %w", err)
+		return allocation.Input{}, nil, nil, fmt.Errorf("fetch courses: %w", err)
 	}
 
 	occupied, err := database.FetchOccupiedSeats(tx)
 	if err != nil {
-		return allocation.Input{}, fmt.Errorf("fetch occupied seats: %w", err)
+		return allocation.Input{}, nil, nil, fmt.Errorf("fetch occupied seats: %w", err)
 	}
 
 	promotion, err := database.FetchPromotionCandidates(tx)
 	if err != nil {
-		return allocation.Input{}, fmt.Errorf("fetch promotion candidates: %w", err)
+		return allocation.Input{}, nil, nil, fmt.Errorf("fetch promotion candidates: %w", err)
 	}
 
 	waitlist, err := database.FetchUncalledWaitlist(tx)
 	if err != nil {
-		return allocation.Input{}, fmt.Errorf("fetch waitlist: %w", err)
+		return allocation.Input{}, nil, nil, fmt.Errorf("fetch waitlist: %w", err)
 	}
 
 	byCourse := make(map[int32]*allocation.Course, len(courses))
@@ -142,19 +164,33 @@ func allocationInput(db *database.Database, tx qrm.DB, open [2]bool) (allocation
 		}
 	}
 
+	var ids []int32
+
 	for _, r := range promotion {
 		if c, ok := byCourse[r.CourseID]; ok {
 			c.Promotion = append(c.Promotion, toCandidate(r))
+			ids = append(ids, r.ID)
 		}
 	}
 
 	for _, r := range waitlist {
 		if c, ok := byCourse[r.CourseID]; ok {
 			c.Waitlist = append(c.Waitlist, toCandidate(r))
+			ids = append(ids, r.ID)
 		}
 	}
 
-	return in, nil
+	regs, err := database.FetchRegistrationsByIDs(tx, ids)
+	if err != nil {
+		return allocation.Input{}, nil, nil, fmt.Errorf("fetch registrations: %w", err)
+	}
+
+	registrations := make(map[int32]*types.Registration, len(regs))
+	for _, r := range regs {
+		registrations[r.ID] = r
+	}
+
+	return in, courses, registrations, nil
 }
 
 func toCandidate(r model.Registrations) allocation.Candidate {
@@ -163,6 +199,15 @@ func toCandidate(r model.Registrations) allocation.Candidate {
 		Ranking:        r.Ranking,
 		CompositeScore: r.CompositeScore,
 	}
+}
+
+func pick(registrations map[int32]*types.Registration, ids []int32) []*types.Registration {
+	out := make([]*types.Registration, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, registrations[id])
+	}
+
+	return out
 }
 
 func newEntries(ids []int32, kind types.CallEntryKind, semester int32) []*types.CallEntry {
