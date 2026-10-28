@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/alecthomas/kong v1.16.1
-	github.com/dimchansky/utfbom v1.1.1
+	github.com/dimchansky/utfbom v1.2.0
 	github.com/gen2brain/go-fitz v1.28.2
 	github.com/go-jet/jet/v2 v2.16.0
 	github.com/gocarina/gocsv v0.0.0-20230616125104-99d496ca653d
